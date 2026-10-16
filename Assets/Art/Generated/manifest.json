@@ -1,0 +1,164 @@
+{
+  "items": [
+    {
+      "name": "cell_block",
+      "ppu": 128,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "cell_empty",
+      "ppu": 128,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "board_frame",
+      "ppu": 128,
+      "border": [
+        64,
+        64,
+        64,
+        64
+      ]
+    },
+    {
+      "name": "hud_panel_best",
+      "ppu": 100,
+      "border": [
+        44,
+        44,
+        44,
+        44
+      ]
+    },
+    {
+      "name": "hud_panel_score",
+      "ppu": 100,
+      "border": [
+        44,
+        44,
+        44,
+        44
+      ]
+    },
+    {
+      "name": "bar_track",
+      "ppu": 100,
+      "border": [
+        28,
+        28,
+        28,
+        28
+      ]
+    },
+    {
+      "name": "bar_fill",
+      "ppu": 100,
+      "border": [
+        28,
+        28,
+        28,
+        28
+      ]
+    },
+    {
+      "name": "btn_square",
+      "ppu": 100,
+      "border": [
+        36,
+        36,
+        36,
+        36
+      ]
+    },
+    {
+      "name": "icon_gear",
+      "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "icon_crown",
+      "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "popup_panel",
+      "ppu": 100,
+      "border": [
+        96,
+        96,
+        96,
+        96
+      ]
+    },
+    {
+      "name": "title_ribbon",
+      "ppu": 100,
+      "border": [
+        56,
+        56,
+        56,
+        56
+      ]
+    },
+    {
+      "name": "btn_gold",
+      "ppu": 100,
+      "border": [
+        48,
+        52,
+        48,
+        48
+      ]
+    },
+    {
+      "name": "btn_green",
+      "ppu": 100,
+      "border": [
+        48,
+        52,
+        48,
+        48
+      ]
+    },
+    {
+      "name": "mascot",
+      "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "bg_wood",
+      "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

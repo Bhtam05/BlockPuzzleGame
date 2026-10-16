@@ -7,12 +7,13 @@ namespace BlockPuzzle
     public enum GameState
     {
         Playing,
+        Paused,
         GameOver
     }
 
     /// <summary>
     /// Điều phối toàn bộ game: nhận event đặt khối, gọi Grid/Score/Spawner,
-    /// kiểm tra Game Over và xử lý chơi lại.
+    /// kiểm tra Game Over, Pause/Resume và xử lý chơi lại.
     /// </summary>
     public class GameManager : MonoBehaviour
     {
@@ -25,7 +26,11 @@ namespace BlockPuzzle
         [Header("Game Over UI")]
         [SerializeField] private GameObject gameOverPanel;
         [SerializeField] private TMP_Text finalScoreText;
+        [SerializeField] private TMP_Text finalBestText;
         [SerializeField] private float gameOverDelay = 0.6f;
+
+        [Header("Pause UI")]
+        [SerializeField] private GameObject pausePanel;
 
         public GameState State { get; private set; } = GameState.Playing;
         public bool IsPlaying => State == GameState.Playing;
@@ -50,6 +55,7 @@ namespace BlockPuzzle
         {
             State = GameState.Playing;
             if (gameOverPanel != null) gameOverPanel.SetActive(false);
+            if (pausePanel != null) pausePanel.SetActive(false);
 
             grid.ResetGrid();
             score.ResetScore();
@@ -59,6 +65,24 @@ namespace BlockPuzzle
 
         /// <summary>Gắn vào nút Replay trên UI.</summary>
         public void Restart() => StartGame();
+
+        /// <summary>Gắn vào nút cài đặt (bánh răng): tạm dừng và hiện panel Pause.</summary>
+        public void Pause()
+        {
+            if (State != GameState.Playing) return;
+
+            State = GameState.Paused;
+            if (pausePanel != null) pausePanel.SetActive(true);
+        }
+
+        /// <summary>Gắn vào nút Tiếp tục trong panel Pause.</summary>
+        public void Resume()
+        {
+            if (State != GameState.Paused) return;
+
+            State = GameState.Playing;
+            if (pausePanel != null) pausePanel.SetActive(false);
+        }
 
         /// <summary>
         /// Xử lý khi người chơi thả khối hợp lệ:
@@ -98,22 +122,24 @@ namespace BlockPuzzle
         }
 
         private void GameOver()
-{
-    if (State == GameState.GameOver) return;
+        {
+            if (State == GameState.GameOver) return;
 
-    State = GameState.GameOver;
-    score.SaveHighScore();
+            State = GameState.GameOver;
+            Debug.Log($"GAME OVER - điểm: {score.Score}");
+            if (gameOverPanel == null)
+                Debug.LogWarning("Chưa gán Game Over Panel trong GameManager!", this);
 
-    // Chờ animation xóa hàng/cột chạy xong rồi mới hiện panel
-    DOVirtual.DelayedCall(gameOverDelay, () =>
-    {
-        if (State != GameState.GameOver) return; // người chơi đã restart
-        
-        // Sửa lại dòng này để hiện thêm chữ Score:
-        if (finalScoreText != null) finalScoreText.text = $"Score: {score.Score}";
-        
-        if (gameOverPanel != null) gameOverPanel.SetActive(true);
-    });
-}
+            score.SaveHighScore();
+
+            // Chờ animation xóa hàng/cột chạy xong rồi mới hiện panel
+            DOVirtual.DelayedCall(gameOverDelay, () =>
+            {
+                if (State != GameState.GameOver) return; // người chơi đã restart
+                if (finalScoreText != null) finalScoreText.text = score.Score.ToString();
+                if (finalBestText != null) finalBestText.text = score.HighScore.ToString();
+                if (gameOverPanel != null) gameOverPanel.SetActive(true);
+            });
+        }
     }
 }

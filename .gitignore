@@ -1,16 +1,32 @@
+# Unity
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
 /[Bb]uild/
 /[Bb]uilds/
 /[Ll]ogs/
-/[Uu]serSettings/
-/[Mm]emoryCaptures/
-/*.csproj
-/*.sln
-/*.suo
-/*.user
-/*.userprefs
-/*.pidb
-/*.booproj
-/*.svd
+/[Uu]ser[Ss]ettings/
+/[Mm]emory[Cc]aptures/
+
+# IDE
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.sln
+*.suo
+*.user
+*.pidb
+*.booproj
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+*.apk
+*.aab
+*.unitypackage
+
+# Giữ lại file .meta (bắt buộc để không mất reference trong Unity)
+!*.meta

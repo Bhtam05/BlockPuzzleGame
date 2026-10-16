@@ -31,6 +31,17 @@ namespace BlockPuzzle
         public int Height => height;
         public float CellSize => cellSize;
 
+        /// <summary>Tâm hình học của cả bảng (World Position). Dùng để đặt khung/nền bảng.</summary>
+        public Vector3 BoardCenter
+        {
+            get
+            {
+                Transform origin = gridOrigin != null ? gridOrigin : transform;
+                return origin.position + new Vector3((width - 1) * cellSize * 0.5f,
+                                                     (height - 1) * cellSize * 0.5f, 0f);
+            }
+        }
+
         private int[,] _grid;
         private SpriteRenderer[,] _blocks;
         private bool[] _rowFull;

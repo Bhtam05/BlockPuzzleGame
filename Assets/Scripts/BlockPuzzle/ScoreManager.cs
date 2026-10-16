@@ -30,7 +30,11 @@ namespace BlockPuzzle
         public int ComboStreak { get; private set; }
         public float ComboMultiplier => 1f + ComboStreak * comboStep;
 
+        /// <summary>Tổng số hàng/cột đã xóa trong ván (HUD dùng cho thanh tiến độ).</summary>
+        public int TotalLines { get; private set; }
+
         public event Action<int> ScoreChanged;
+        public event Action<int> LinesChanged;
 
         private int _displayedScore;
         private Tween _scoreTween;
@@ -50,6 +54,8 @@ namespace BlockPuzzle
 
             if (clearedLines > 0)
             {
+                TotalLines += clearedLines;
+                LinesChanged?.Invoke(TotalLines);
                 ComboStreak++;
                 int lineScore = pointsPerLine * clearedLines * clearedLines;
                 gained += Mathf.RoundToInt(lineScore * ComboMultiplier);
@@ -83,6 +89,8 @@ namespace BlockPuzzle
         {
             Score = 0;
             ComboStreak = 0;
+            TotalLines = 0;
+            LinesChanged?.Invoke(0);
             RefreshUI(true);
             UpdateComboUI();
         }
@@ -93,9 +101,7 @@ namespace BlockPuzzle
 
         private void RefreshUI(bool immediate)
         {
-            if (highScoreText != null) 
-                highScoreText.text = $"Best Score: {HighScore}";
-
+            if (highScoreText != null) highScoreText.text = HighScore.ToString();
             if (scoreText == null) return;
 
             _scoreTween?.Kill();
@@ -103,7 +109,7 @@ namespace BlockPuzzle
             if (immediate)
             {
                 _displayedScore = Score;
-                scoreText.text = $"Score: {Score}";
+                scoreText.text = Score.ToString();
                 return;
             }
 
@@ -111,7 +117,7 @@ namespace BlockPuzzle
             _scoreTween = DOTween.To(() => _displayedScore, v =>
                 {
                     _displayedScore = v;
-                    scoreText.text = $"Score: {v}";
+                    scoreText.text = v.ToString();
                 }, Score, 0.35f).SetEase(Ease.OutQuad);
 
             scoreText.transform.DOKill(true);
@@ -120,8 +126,7 @@ namespace BlockPuzzle
 
         private void UpdateComboUI()
         {
-            if (comboText != null) 
-                comboText.text = ComboStreak > 0 ? $"x{ComboMultiplier.ToString("0.0")}" : "";
+            if (comboText != null) comboText.text = "x" + ComboMultiplier.ToString("0.0");
         }
     }
 }

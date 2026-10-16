@@ -112,8 +112,11 @@ namespace BlockPuzzle
             _grid.HidePreview();
             _lastOrigin = new Vector2Int(int.MinValue, int.MinValue);
 
+            // Đang Pause/Game Over mà vẫn thả khối (kéo bằng ngón khác) thì cho bay về khay, không để kẹt
+            bool canDrop = GameManager.Instance != null && GameManager.Instance.IsPlaying;
+
             Vector2Int origin = GetOriginCell();
-            if (_grid.CanPlace(Shape.NormalizedCells, origin))
+            if (canDrop && _grid.CanPlace(Shape.NormalizedCells, origin))
             {
                 Placed?.Invoke(this, origin);
             }

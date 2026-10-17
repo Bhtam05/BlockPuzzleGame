@@ -184,6 +184,7 @@ namespace BlockPuzzle.EditorTools
             SetupSlots(spawner);
             SetupBoardFrame(grid);
             Canvas hud = BuildHud(score, gm);
+            SetupEffects(grid, gm);
 
             Undo.CollapseUndoOperations(undoGroup);
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
@@ -394,6 +395,64 @@ namespace BlockPuzzle.EditorTools
             }
         }
 
+        // ================================================================== Hiệu ứng xóa hàng/cột
+
+        /// <summary>Tạo prefab chữ điểm, object Effects (ClearEffects), ScreenShake trên camera và nối vào GameManager.</summary>
+        private static void SetupEffects(GridManager grid, GameManager gm)
+        {
+            Material outBrown = OutlineMaterial("TMP_Outline_Brown", new Color32(92, 46, 20, 255), 0.22f);
+            TextMeshPro popup = CreatePopupPrefab(outBrown);
+
+            var fx = Find<ClearEffects>();
+            if (fx == null)
+            {
+                var go = new GameObject("Effects");
+                Undo.RegisterCreatedObjectUndo(go, "Create Effects");
+                fx = go.AddComponent<ClearEffects>();
+            }
+
+            // ScreenShake nằm trên camera để rung cả thế giới game (HUD đứng yên)
+            Camera cam = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
+            ScreenShake shake = null;
+            if (cam != null)
+            {
+                shake = cam.GetComponent<ScreenShake>();
+                if (shake == null) shake = Undo.AddComponent<ScreenShake>(cam.gameObject);
+            }
+
+            SetRef(fx, "grid", grid);
+            SetRef(fx, "shake", shake);
+            SetRef(fx, "popupPrefab", popup);
+            SetRef(fx, "chipSprite", LoadSprite("fx_chip"));
+            SetRef(fx, "sparkSprite", LoadSprite("fx_spark"));
+            SetRef(fx, "streakSprite", LoadSprite("fx_streak"));
+            SetRef(gm, "effects", fx);
+        }
+
+        /// <summary>Prefab chữ điểm bay lên: TextMeshPro 3D (nằm trong thế giới game) có viền nâu.</summary>
+        private static TextMeshPro CreatePopupPrefab(Material outline)
+        {
+            EnsureFolder(PrefabDir);
+
+            var go = new GameObject("ScorePopup");
+            var t = go.AddComponent<TextMeshPro>();
+            if (_font != null) t.font = _font;
+            if (outline != null) t.fontSharedMaterial = outline;
+            t.text = "+10";
+            t.fontSize = 6f;
+            t.color = Gold;
+            t.alignment = TextAlignmentOptions.Center;
+            t.fontStyle = FontStyles.Bold;
+            t.textWrappingMode = TextWrappingModes.NoWrap;
+            t.overflowMode = TextOverflowModes.Overflow;
+            t.sortingOrder = 60; // trên ô gạch và hạt, dưới khối đang kéo
+            t.rectTransform.sizeDelta = new Vector2(8f, 2f);
+
+            GameObject asset = PrefabUtility.SaveAsPrefabAsset(go, PrefabDir + "/ScorePopup.prefab");
+            Object.DestroyImmediate(go);
+            return asset.GetComponent<TextMeshPro>();
+        }
+
         // ================================================================== HUD
 
         private static Canvas BuildHud(ScoreManager score, GameManager gm)
@@ -452,30 +511,10 @@ namespace BlockPuzzle.EditorTools
             Place(gearIcon.rectTransform, MC, MC, new Vector2(0f, 4f), new Vector2(76f, 76f));
             UnityEventTools.AddVoidPersistentListener(gear.onClick, gm.Pause);
 
-            // ---- Thanh tiến độ + combo
-            Image track = NewImage("ProgressTrack", safe, LoadSprite("bar_track"));
-            Place(track.rectTransform, TL, TL, new Vector2(40f, -345f), new Vector2(870f, 60f));
-
-            Image fill = NewImage("Fill", track.transform, LoadSprite("bar_fill"));
-            fill.rectTransform.anchorMin = Vector2.zero;
-            fill.rectTransform.anchorMax = new Vector2(0.08f, 1f);
-            fill.rectTransform.pivot = new Vector2(0f, 0.5f);
-            fill.rectTransform.offsetMin = Vector2.zero;
-            fill.rectTransform.offsetMax = Vector2.zero;
-
-            TextMeshProUGUI progressLabel = NewText("Label", track.transform, "0/25", 34f, Cream,
+            // ---- Hệ số combo (x1.0, x1.1...) nằm giữa, ngay dưới hai khung điểm
+            TextMeshProUGUI combo = NewText("ComboText", safe, "x1.0", 64f, Gold,
                 TextAlignmentOptions.Center, outBrown);
-            Stretch(progressLabel.rectTransform);
-
-            TextMeshProUGUI combo = NewText("ComboText", safe, "x1.0", 56f, Gold,
-                TextAlignmentOptions.MidlineRight, outBrown);
-            Place(combo.rectTransform, TR, TR, new Vector2(-40f, -340f), new Vector2(170f, 70f));
-
-            // ---- HudView điều khiển thanh tiến độ
-            var hud = safe.gameObject.AddComponent<HudView>();
-            SetRef(hud, "score", score);
-            SetRef(hud, "progressFill", fill.rectTransform);
-            SetRef(hud, "progressLabel", progressLabel);
+            Place(combo.rectTransform, TC, TC, new Vector2(0f, -352f), new Vector2(320f, 80f));
 
             // ---- Popup (nằm trên cùng, vẽ sau HUD)
             BuildGameOverPopup(canvasGo.transform, gm, outRed, outBrown);

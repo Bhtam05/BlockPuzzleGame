@@ -51,26 +51,6 @@
       ]
     },
     {
-      "name": "bar_track",
-      "ppu": 100,
-      "border": [
-        28,
-        28,
-        28,
-        28
-      ]
-    },
-    {
-      "name": "bar_fill",
-      "ppu": 100,
-      "border": [
-        28,
-        28,
-        28,
-        28
-      ]
-    },
-    {
       "name": "btn_square",
       "ppu": 100,
       "border": [
@@ -153,6 +133,36 @@
     {
       "name": "bg_wood",
       "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "fx_chip",
+      "ppu": 128,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "fx_spark",
+      "ppu": 64,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "fx_streak",
+      "ppu": 128,
       "border": [
         0,
         0,

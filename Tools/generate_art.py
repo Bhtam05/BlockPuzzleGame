@@ -196,14 +196,6 @@ def make_hud():
     q = over(glow, q)
     save("hud_panel_score", q, border=(44, 44, 44, 44))
 
-    # Thanh tiến độ
-    track = plate(256, 56, 28, ((70, 40, 22), (40, 22, 12)), (((46, 26, 15)), (64, 38, 22)), 5,
-                  outline=(30, 16, 8), glossy=False)
-    save("bar_track", track, border=(28, 28, 28, 28))
-    fillbar = plate(256, 56, 28, ((255, 236, 130), (232, 170, 30)), ((255, 220, 70), (240, 168, 20)), 5,
-                    outline=(170, 100, 10))
-    save("bar_fill", fillbar, border=(28, 28, 28, 28))
-
     # Nút tròn vuông chứa icon cài đặt
     btn = plate(128, 128, 30, ((240, 176, 96), (170, 98, 44)), ((226, 150, 70), (190, 110, 48)), 8,
                 outline=(88, 46, 18))
@@ -299,6 +291,54 @@ def make_mascot():
     save("mascot", img.resize((W, H), Image.LANCZOS))
 
 
+# ----------------------------------------------------------------------------- hiệu ứng
+def make_fx():
+    """Mảnh gỗ vỡ, tia lấp lánh, vệt sáng quét. Vẽ gần trắng/vàng nhạt để Unity tô màu."""
+    # Mảnh gỗ: đa giác méo có mặt sáng và mặt tối
+    S = 64
+    big = Image.new("RGBA", (S * SS, S * SS), (0, 0, 0, 0))
+    d = ImageDraw.Draw(big, "RGBA")
+
+    def poly(pts, col):
+        d.polygon([(x * SS, y * SS) for x, y in pts], fill=col)
+
+    poly([(9, 20), (34, 8), (57, 24), (48, 53), (15, 50)], (150, 150, 150, 255))   # viền tối
+    poly([(13, 22), (34, 12), (52, 26), (45, 48), (18, 46)], (222, 222, 222, 255))  # mặt chính
+    poly([(13, 22), (34, 12), (52, 26), (32, 31)], (255, 255, 255, 255))            # mặt sáng
+    poly([(32, 31), (52, 26), (45, 48), (18, 46)], (205, 205, 205, 255))            # mặt tối
+    save("fx_chip", big.resize((S, S), Image.LANCZOS), ppu=128)
+
+    # Tia lấp lánh 4 cánh + quầng sáng
+    N = 64
+    yy, xx = np.mgrid[0:N, 0:N]
+    u = (xx - (N - 1) / 2) / (N / 2)
+    v = (yy - (N - 1) / 2) / (N / 2)
+    r = np.sqrt(u * u + v * v)
+    glow = np.exp(-(r / 0.28) ** 2)
+    ray_h = np.exp(-np.abs(v) * 22) * np.clip(1 - np.abs(u), 0, 1) ** 2
+    ray_v = np.exp(-np.abs(u) * 22) * np.clip(1 - np.abs(v), 0, 1) ** 2
+    a = np.clip(glow * 0.9 + np.maximum(ray_h, ray_v), 0, 1)
+    arr = np.zeros((N, N, 4), np.uint8)
+    arr[..., 0], arr[..., 1], arr[..., 2] = 255, 240, 190
+    arr[..., 3] = (a * 255).astype(np.uint8)
+    save("fx_spark", Image.fromarray(arr, "RGBA"), ppu=64)
+
+    # Vệt sáng quét: đuôi mờ dần về bên trái, đầu sáng gắt ở bên phải
+    W, H = 256, 64
+    yy, xx = np.mgrid[0:H, 0:W]
+    uu = xx / (W - 1)
+    vv = (yy - (H - 1) / 2) / (H / 2)
+    head = np.cos(np.clip((uu - 0.82) / 0.18, 0, 1) * np.pi / 2) ** 2          # đầu tắt mượt, không cụt
+    along = np.where(uu < 0.82, (uu / 0.82) ** 2.2, head)
+    window = np.clip(1 - vv ** 2, 0, 1) ** 2                                   # triệt viền trên/dưới
+    across = (np.exp(-(vv / 0.28) ** 2) * 0.9 + np.exp(-(vv / 0.7) ** 2) * 0.35) * window
+    a = np.clip(along * across, 0, 1)
+    arr = np.zeros((H, W, 4), np.uint8)
+    arr[..., 0], arr[..., 1], arr[..., 2] = 255, 240, 175
+    arr[..., 3] = (a * 255).astype(np.uint8)
+    save("fx_streak", Image.fromarray(arr, "RGBA"), ppu=128)
+
+
 # ----------------------------------------------------------------------------- nền
 def make_background():
     W, H = 512, 1024
@@ -345,8 +385,6 @@ def make_preview():
     cv.alpha_composite(load("mascot").resize((144, 113)), (588, 16))
     gb = load("btn_square").resize((100, 100)); cv.alpha_composite(gb, (780, 20))
     cv.alpha_composite(load("icon_gear").resize((64, 64)), (798, 38))
-    tr = nine(load("bar_track"), (28, 28, 28, 28), (820, 56)); cv.alpha_composite(tr, (40, 270))
-    fl = nine(load("bar_fill"), (28, 28, 28, 28), (200, 56)); cv.alpha_composite(fl, (40, 270))
     # popup mẫu
     pop = nine(load("popup_panel"), (96, 96, 96, 96), (560, 420))
     rib = nine(load("title_ribbon"), (56, 56, 56, 56), (440, 100))
@@ -365,6 +403,7 @@ if __name__ == "__main__":
     make_popup()
     make_mascot()
     make_background()
+    make_fx()
     with open(os.path.join(OUT, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump({"items": manifest}, f, indent=2)
     make_preview()

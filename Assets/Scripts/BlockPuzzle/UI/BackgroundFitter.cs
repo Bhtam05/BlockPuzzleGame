@@ -10,6 +10,9 @@ namespace BlockPuzzle
     [DefaultExecutionOrder(100)]
     public class BackgroundFitter : MonoBehaviour
     {
+        [Tooltip("Phóng to thêm một chút để khi camera rung không lộ mép nền.")]
+        [SerializeField, Range(1f, 1.3f)] private float overscan = 1.08f;
+
         private SpriteRenderer _sr;
         private Camera _cam;
         private int _lastW, _lastH;
@@ -36,7 +39,7 @@ namespace BlockPuzzle
             float viewH = _lastSize * 2f;
             float viewW = viewH * _cam.aspect;
             Vector2 spriteSize = _sr.sprite.bounds.size;
-            float scale = Mathf.Max(viewW / spriteSize.x, viewH / spriteSize.y);
+            float scale = Mathf.Max(viewW / spriteSize.x, viewH / spriteSize.y) * overscan;
 
             transform.localScale = Vector3.one * scale;
             Vector3 p = _cam.transform.position;

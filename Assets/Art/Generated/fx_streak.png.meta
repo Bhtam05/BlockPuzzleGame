@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 450d1e3d80121894eb7cd740945f101a
+guid: 4e980cad761708b4da2fdf322731331e
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 7500260010790956564
-    second: bar_fill_0
+      213: 48080974573339152
+    second: fx_streak_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -51,8 +51,8 @@ TextureImporter:
   spriteMeshType: 0
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
-  spritePixelsToUnits: 100
-  spriteBorder: {x: 28, y: 28, z: 28, w: 28}
+  spritePixelsToUnits: 128
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
   spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
   alphaIsTransparency: 1
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: bar_fill_0
+      name: fx_streak_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 0
-        width: 256
-        height: 56
+        x: 15
+        y: 3
+        width: 240
+        height: 58
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 41e2342edb6461860800000000000000
-      internalID: 7500260010790956564
+      spriteID: 01206e14461daa000800000000000000
+      internalID: 48080974573339152
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      bar_fill_0: 7500260010790956564
+      fx_streak_0: 48080974573339152
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -42,6 +42,9 @@ namespace BlockPuzzle
             }
         }
 
+        /// <summary>Thông tin lần xóa gần nhất (hàng, cột, vị trí và màu từng ô). Được tái sử dụng, chỉ đọc ngay sau ClearFullLines.</summary>
+        public ClearInfo LastClear { get; } = new ClearInfo();
+
         private int[,] _grid;
         private SpriteRenderer[,] _blocks;
         private bool[] _rowFull;
@@ -164,6 +167,7 @@ namespace BlockPuzzle
         public int ClearFullLines()
         {
             int lines = 0;
+            LastClear.Reset();
 
             // Bước 1: đánh dấu trước, chưa xóa gì để các đường giao nhau vẫn tính đúng
             for (int y = 0; y < height; y++)
@@ -190,12 +194,21 @@ namespace BlockPuzzle
 
             if (lines == 0) return 0;
 
+            // Ghi lại hàng/cột bị xóa để dựng hiệu ứng
+            for (int y = 0; y < height; y++) if (_rowFull[y]) LastClear.Rows.Add(y);
+            for (int x = 0; x < width; x++) if (_colFull[x]) LastClear.Cols.Add(x);
+
             // Bước 2: xóa các ô thuộc hàng/cột đầy
             for (int x = 0; x < width; x++)
             {
                 for (int y = 0; y < height; y++)
                 {
-                    if (_rowFull[y] || _colFull[x]) ClearCell(x, y);
+                    if (!_rowFull[y] && !_colFull[x]) continue;
+
+                    // Ghi vị trí + màu ô trước khi ClearCell giải phóng sprite
+                    LastClear.CellPositions.Add(GridToWorld(x, y));
+                    LastClear.CellColors.Add(_blocks[x, y] != null ? _blocks[x, y].color : Color.white);
+                    ClearCell(x, y);
                 }
             }
 

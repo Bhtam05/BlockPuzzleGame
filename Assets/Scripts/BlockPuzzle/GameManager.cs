@@ -32,6 +32,9 @@ namespace BlockPuzzle
         [Header("Pause UI")]
         [SerializeField] private GameObject pausePanel;
 
+        [Header("Hiệu ứng")]
+        [SerializeField] private ClearEffects effects;
+
         public GameState State { get; private set; } = GameState.Playing;
         public bool IsPlaying => State == GameState.Playing;
 
@@ -50,6 +53,17 @@ namespace BlockPuzzle
 
         private void Start() => StartGame();
 
+        /// <summary>
+        /// Trên điện thoại: thoát app hoặc có cuộc gọi đến thì tự Pause và lưu điểm cao
+        /// (Android có thể đóng app bất kỳ lúc nào khi đang ở nền).
+        /// </summary>
+        private void OnApplicationPause(bool paused)
+        {
+            if (!paused) return;
+            score.SaveHighScore();
+            Pause();
+        }
+
         /// <summary>Bắt đầu / chơi lại ván mới.</summary>
         public void StartGame()
         {
@@ -57,6 +71,7 @@ namespace BlockPuzzle
             if (gameOverPanel != null) gameOverPanel.SetActive(false);
             if (pausePanel != null) pausePanel.SetActive(false);
 
+            if (effects != null) effects.StopAll();
             grid.ResetGrid();
             score.ResetScore();
             spawner.ClearAll();
@@ -96,7 +111,10 @@ namespace BlockPuzzle
             grid.PlaceShape(shape.NormalizedCells, origin, shape.color);
 
             int lines = grid.ClearFullLines();
-            score.RegisterTurn(shape.CellCount, lines);
+            int gained = score.RegisterTurn(shape.CellCount, lines);
+
+            // Hiệu ứng: mảnh gỗ, tia sáng, chữ điểm, rung camera (chỉ khi có xóa đường)
+            if (lines > 0 && effects != null) effects.PlayClear(grid.LastClear, gained, score.ComboStreak);
 
             spawner.Release(piece);
             if (spawner.IsEmpty) spawner.SpawnSet();

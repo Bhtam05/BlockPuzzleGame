@@ -9,7 +9,7 @@ namespace BlockPuzzle
     public static class BlockShapeLibrary
     {
         // Sprite ô gạch vẽ gần trắng để tô màu, nên đây là màu vàng gỗ của ảnh mẫu
-        private static readonly Color Gold = new Color(1f, 0.86f, 0.50f);
+        private static readonly Color Gold = new Color(0.97f, 0.79f, 0.54f);
 
         public static List<BlockShapeData> CreateDefaults()
         {

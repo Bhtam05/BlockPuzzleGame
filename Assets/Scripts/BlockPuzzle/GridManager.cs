@@ -25,6 +25,7 @@ namespace BlockPuzzle
         [Header("FX")]
         [SerializeField] private float placeDuration = 0.12f;
         [SerializeField] private float clearDuration = 0.25f;
+        [SerializeField] private float placeFlash = 0.28f;
         [SerializeField, Range(0f, 1f)] private float previewAlpha = 0.45f;
 
         public int Width => width;
@@ -47,6 +48,7 @@ namespace BlockPuzzle
 
         private int[,] _grid;
         private SpriteRenderer[,] _blocks;
+        private Color[,] _cellColor; // màu thật của ô (SpriteRenderer.color có thể đang chớp sáng)
         private bool[] _rowFull;
         private bool[] _colFull;
 
@@ -61,6 +63,7 @@ namespace BlockPuzzle
 
             _grid = new int[width, height];
             _blocks = new SpriteRenderer[width, height];
+            _cellColor = new Color[width, height];
             _rowFull = new bool[height];
             _colFull = new bool[width];
 
@@ -153,8 +156,16 @@ namespace BlockPuzzle
                 sr.color = color;
                 sr.sortingOrder = 1;
                 _blocks[x, y] = sr;
+                _cellColor[x, y] = color;
 
                 sr.transform.DOScale(cellSize, placeDuration).SetEase(Ease.OutBack);
+
+                // Chớp sáng khi vừa đặt xuống rồi về màu gạch (SetTarget để DOKill của ô cũng dừng tween này)
+                Color target = color;
+                Color flash = Color.Lerp(color, Color.white, 0.75f);
+                sr.color = flash;
+                DOTween.To(() => 0f, t => sr.color = Color.Lerp(flash, target, t), 1f, placeFlash)
+                    .SetEase(Ease.OutQuad).SetTarget(sr.transform);
             }
         }
 
@@ -207,7 +218,7 @@ namespace BlockPuzzle
 
                     // Ghi vị trí + màu ô trước khi ClearCell giải phóng sprite
                     LastClear.CellPositions.Add(GridToWorld(x, y));
-                    LastClear.CellColors.Add(_blocks[x, y] != null ? _blocks[x, y].color : Color.white);
+                    LastClear.CellColors.Add(_blocks[x, y] != null ? _cellColor[x, y] : Color.white);
                     ClearCell(x, y);
                 }
             }
@@ -264,6 +275,72 @@ namespace BlockPuzzle
                 _previewPool.Add(sr);
             }
             return _previewPool[index];
+        }
+
+        // ----------------------------------------------------------------- Lưu / khôi phục ván
+
+        /// <summary>Số ô đang có gạch.</summary>
+        public int FilledCount
+        {
+            get
+            {
+                int n = 0;
+                for (int x = 0; x < width; x++)
+                    for (int y = 0; y < height; y++)
+                        if (_grid[x, y] != 0) n++;
+                return n;
+            }
+        }
+
+        /// <summary>Tỉ lệ bảng đã lấp đầy, 0..1 (dùng chỉnh độ khó khi sinh khối).</summary>
+        public float FillRatio => (float)FilledCount / (width * height);
+
+        /// <summary>
+        /// Ghi trạng thái bảng vào mảng phẳng (chỉ số x * height + y): 0 = trống, khác 0 = màu ô đã nén.
+        /// Màu luôn có alpha 255 nên giá trị khác 0.
+        /// </summary>
+        public void ExportCells(int[] buffer)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    int i = x * height + y;
+                    if (_grid[x, y] == 0 || _blocks[x, y] == null) { buffer[i] = 0; continue; }
+
+                    Color32 c = _cellColor[x, y];
+                    buffer[i] = (c.r << 24) | (c.g << 16) | (c.b << 8) | 255;
+                }
+            }
+        }
+
+        /// <summary>Dựng lại bảng từ mảng do ExportCells ghi ra (không chạy animation).</summary>
+        public void ImportCells(int[] data)
+        {
+            ResetGrid();
+            if (data == null || data.Length != width * height) return;
+
+            for (int x = 0; x < width; x++)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    int v = data[x * height + y];
+                    if (v == 0) continue;
+
+                    _grid[x, y] = 1;
+
+                    SpriteRenderer sr = GetBlock();
+                    sr.transform.DOKill();
+                    sr.transform.position = GridToWorld(x, y);
+                    sr.transform.localScale = Vector3.one * cellSize;
+                    Color32 c32 = new Color32((byte)((v >> 24) & 0xFF), (byte)((v >> 16) & 0xFF),
+                                              (byte)((v >> 8) & 0xFF), 255);
+                    sr.color = c32;
+                    sr.sortingOrder = 1;
+                    _blocks[x, y] = sr;
+                    _cellColor[x, y] = c32;
+                }
+            }
         }
 
         // ----------------------------------------------------------------- Reset & Pool

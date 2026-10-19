@@ -27,18 +27,32 @@ namespace BlockPuzzle.EditorTools
         private const string PrefabDir = "Assets/Prefabs";
         private const string CanvasName = "HUDCanvas";
 
-        // ------------------------------------------------------------------ Chữ hiển thị
-        // LiberationSans mặc định của TextMeshPro không có đủ dấu tiếng Việt, nên để tiếng Anh.
-        // Muốn tiếng Việt: tạo Font Asset (Dynamic) từ font có hỗ trợ dấu rồi đổi các chuỗi này.
-        private const string TxtBest = "BEST";
-        private const string TxtScore = "SCORE";
-        private const string TxtGameOver = "GAME OVER";
-        private const string TxtYourScore = "YOUR SCORE";
-        private const string TxtBestScore = "BEST SCORE";
-        private const string TxtPlayAgain = "PLAY AGAIN";
-        private const string TxtPaused = "PAUSED";
-        private const string TxtResume = "RESUME";
-        private const string TxtRestart = "RESTART";
+        // ------------------------------------------------------------------ Font + chữ hiển thị
+        // Font chính là DejaVu Sans Bold (Assets/Fonts) đủ dấu tiếng Việt. Tool tự tạo TMP Font Asset (Dynamic) từ file .ttf.
+        // Nếu tạo font thất bại thì quay về font TMP mặc định (thiếu dấu) và dùng chữ tiếng Anh.
+        private const string FontTtfPath = "Assets/Fonts/DejaVuSans-Bold.ttf";
+        private const string FontAssetPath = "Assets/Fonts/DejaVuSans-Bold SDF.asset";
+
+        private static bool _vi; // đang dùng font có dấu tiếng Việt
+        private static string Tx(string vi, string en) => _vi ? vi : en;
+        // DejaVu Sans Bold đã đậm sẵn, thêm style Bold nữa TMP sẽ làm đậm giả khiến chữ quá béo
+        private static FontStyles TextStyle => _vi ? FontStyles.Normal : FontStyles.Bold;
+
+        private static string TxtBest => Tx("KỶ LỤC", "BEST");
+        private static string TxtScore => Tx("ĐIỂM", "SCORE");
+        private static string TxtGameOver => Tx("KẾT THÚC", "GAME OVER");
+        private static string TxtYourScore => Tx("ĐIỂM CỦA BẠN", "YOUR SCORE");
+        private static string TxtBestScore => Tx("KỶ LỤC", "BEST SCORE");
+        private static string TxtPlayAgain => Tx("CHƠI LẠI", "PLAY AGAIN");
+        private static string TxtPaused => Tx("TẠM DỪNG", "PAUSED");
+        private static string TxtResume => Tx("TIẾP TỤC", "RESUME");
+        private static string TxtRestart => Tx("VÁN MỚI", "NEW GAME");
+        private static string TxtOn => Tx("BẬT", "ON");
+        private static string TxtOff => Tx("TẮT", "OFF");
+        private static string TxtSound => Tx("Âm thanh", "Sound");
+        private static string TxtMusic => Tx("Nhạc nền", "Music");
+        private static string TxtHaptic => Tx("Rung", "Vibration");
+        private static string TxtShake => Tx("Rung màn hình", "Screen shake");
 
         // ------------------------------------------------------------------ Bố cục World (đơn vị Unity)
         // Camera luôn thấy tối thiểu 17 đơn vị chiều cao nên các số này đúng với mọi màn hình dọc.
@@ -169,7 +183,13 @@ namespace BlockPuzzle.EditorTools
                 return;
             }
 
-            _font = TMP_Settings.defaultFontAsset;
+            _font = LoadVietnameseFont();
+            _vi = _font != null;
+            if (_font == null)
+            {
+                _font = TMP_Settings.defaultFontAsset;
+                Debug.LogWarning("[BlockPuzzle] Không tạo được font tiếng Việt, dùng font TMP mặc định và chữ tiếng Anh.");
+            }
             if (_font == null)
                 Debug.LogWarning("[BlockPuzzle] Chưa có font TMP mặc định. Vào Window > TextMeshPro > Import TMP Essential Resources.");
 
@@ -179,6 +199,7 @@ namespace BlockPuzzle.EditorTools
 
             SetupCamera();
             SetupBackground();
+            SetupAmbientDust();
             SetupGrid(grid);
             SetupPrefabs(grid, spawner);
             SetupSlots(spawner);
@@ -245,6 +266,22 @@ namespace BlockPuzzle.EditorTools
                 fitter.transform.localScale = Vector3.one * Mathf.Max(9.6f / size.x, 17f / size.y);
                 fitter.transform.position = Vector3.zero;
             }
+        }
+
+        /// <summary>Hạt bụi sáng trôi nhẹ ở nền (AmbientDust).</summary>
+        private static void SetupAmbientDust()
+        {
+            var dust = Find<AmbientDust>();
+            if (dust == null)
+            {
+                var go = new GameObject("AmbientDust");
+                Undo.RegisterCreatedObjectUndo(go, "Create AmbientDust");
+                dust = go.AddComponent<AmbientDust>();
+            }
+
+            SetRef(dust, "moteSprite", LoadSprite("fx_mote"));
+            Camera cam = Camera.main != null ? Camera.main : Object.FindFirstObjectByType<Camera>();
+            if (cam != null) SetRef(dust, "cam", cam);
         }
 
         // ------------------------------------------------------------------ Lưới
@@ -442,7 +479,7 @@ namespace BlockPuzzle.EditorTools
             t.fontSize = 6f;
             t.color = Gold;
             t.alignment = TextAlignmentOptions.Center;
-            t.fontStyle = FontStyles.Bold;
+            t.fontStyle = TextStyle;
             t.textWrappingMode = TextWrappingModes.NoWrap;
             t.overflowMode = TextOverflowModes.Overflow;
             t.sortingOrder = 60; // trên ô gạch và hạt, dưới khối đang kéo
@@ -504,7 +541,7 @@ namespace BlockPuzzle.EditorTools
             Image mascot = NewImage("Mascot", safe, LoadSprite("mascot"));
             Place(mascot.rectTransform, TR, BC, new Vector2(-260f, -184f), new Vector2(170f, 133f));
 
-            // ---- Nút cài đặt (bánh răng) -> Pause
+            // ---- Nút cài đặt (bánh răng) -> popup Pause kèm các công tắc cài đặt
             Button gear = NewButton("GearButton", safe, LoadSprite("btn_square"), null, 0f, null);
             Place(gear.image.rectTransform, TR, TR, new Vector2(-36f, -36f), new Vector2(120f, 120f));
             Image gearIcon = NewImage("Icon", gear.transform, LoadSprite("icon_gear"));
@@ -568,17 +605,45 @@ namespace BlockPuzzle.EditorTools
             Material outTitle)
         {
             (RectTransform root, RectTransform window) = NewPopupShell(parent, "PausePanel",
-                new Vector2(720f, 640f), TxtPaused, outTitle);
+                new Vector2(760f, 1180f), TxtPaused, outTitle);
+
+            // Các công tắc cài đặt
+            AddToggle(window, "SoundToggle", SettingKind.Sound, TxtSound, -200f, outBrown);
+            AddToggle(window, "MusicToggle", SettingKind.Music, TxtMusic, -326f, outBrown);
+            AddToggle(window, "HapticToggle", SettingKind.Haptic, TxtHaptic, -452f, outBrown);
+            AddToggle(window, "ShakeToggle", SettingKind.Shake, TxtShake, -578f, outBrown);
 
             Button resume = NewButton("ResumeButton", window, LoadSprite("btn_green"), TxtResume, 56f, outGreen);
-            Place(resume.image.rectTransform, TC, TC, new Vector2(0f, -240f), new Vector2(500f, 150f));
+            Place(resume.image.rectTransform, TC, TC, new Vector2(0f, -760f), new Vector2(500f, 150f));
             UnityEventTools.AddVoidPersistentListener(resume.onClick, gm.Resume);
 
             Button restart = NewButton("RestartButton", window, LoadSprite("btn_gold"), TxtRestart, 56f, outBrown);
-            Place(restart.image.rectTransform, TC, TC, new Vector2(0f, -420f), new Vector2(500f, 150f));
+            Place(restart.image.rectTransform, TC, TC, new Vector2(0f, -940f), new Vector2(500f, 150f));
             UnityEventTools.AddVoidPersistentListener(restart.onClick, gm.Restart);
 
             SetRef(gm, "pausePanel", root.gameObject);
+        }
+
+        /// <summary>Một hàng công tắc cài đặt: nút bản rộng, bật = xanh, tắt = gỗ.</summary>
+        private static void AddToggle(RectTransform window, string name, SettingKind kind, string title, float y,
+            Material outline)
+        {
+            Button btn = NewButton(name, window, LoadSprite("btn_green"), title, 42f, outline);
+            Place(btn.image.rectTransform, TC, TC, new Vector2(0f, y), new Vector2(580f, 112f));
+
+            var toggle = btn.gameObject.AddComponent<SettingToggle>();
+            var so = new SerializedObject(toggle);
+            so.FindProperty("kind").enumValueIndex = (int)kind;
+            so.FindProperty("title").stringValue = title;
+            so.FindProperty("onText").stringValue = TxtOn;
+            so.FindProperty("offText").stringValue = TxtOff;
+            so.FindProperty("label").objectReferenceValue = btn.transform.Find("Label").GetComponent<TMP_Text>();
+            so.FindProperty("background").objectReferenceValue = btn.image;
+            so.FindProperty("onSprite").objectReferenceValue = LoadSprite("btn_green");
+            so.FindProperty("offSprite").objectReferenceValue = LoadSprite("btn_square");
+            so.ApplyModifiedProperties();
+
+            UnityEventTools.AddVoidPersistentListener(btn.onClick, toggle.Toggle);
         }
 
         /// <summary>Khung popup chung: nền tối + cửa sổ giấy + ruy-băng tiêu đề + hiệu ứng mở.</summary>
@@ -705,7 +770,7 @@ namespace BlockPuzzle.EditorTools
             t.fontSize = size;
             t.color = color;
             t.alignment = align;
-            t.fontStyle = FontStyles.Bold;
+            t.fontStyle = TextStyle;
             t.textWrappingMode = TextWrappingModes.NoWrap;
             t.overflowMode = TextOverflowModes.Overflow;
             t.raycastTarget = false;
@@ -794,6 +859,57 @@ namespace BlockPuzzle.EditorTools
             AssetDatabase.CreateFolder(parent, Path.GetFileName(path));
         }
 
+        /// <summary>
+        /// Lấy TMP Font Asset từ DejaVu Sans Bold (đủ dấu tiếng Việt), tạo mới nếu chưa có.
+        /// Asset dạng Dynamic: ký tự được vẽ vào atlas lúc chạy nên không cần liệt kê trước các chữ có dấu.
+        /// </summary>
+        private static TMP_FontAsset LoadVietnameseFont()
+        {
+            var existing = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(FontAssetPath);
+            if (existing != null && existing.material != null) return existing;
+            if (existing != null) AssetDatabase.DeleteAsset(FontAssetPath); // asset hỏng (thiếu material), tạo lại
+
+            var ttf = AssetDatabase.LoadAssetAtPath<Font>(FontTtfPath);
+            if (ttf == null)
+            {
+                Debug.LogWarning("[BlockPuzzle] Thiếu " + FontTtfPath + " (copy thư mục Assets/Fonts vào project).");
+                return null;
+            }
+
+            try
+            {
+                TMP_FontAsset asset = TMP_FontAsset.CreateFontAsset(ttf);
+                if (asset == null) return null;
+
+                AssetDatabase.CreateAsset(asset, FontAssetPath);
+
+                // Material và atlas phải nằm trong cùng file asset thì mới không mất khi đóng Unity
+                if (asset.material != null)
+                {
+                    asset.material.name = "DejaVuSans-Bold SDF Material";
+                    AssetDatabase.AddObjectToAsset(asset.material, asset);
+                }
+                if (asset.atlasTextures != null)
+                {
+                    for (int i = 0; i < asset.atlasTextures.Length; i++)
+                    {
+                        if (asset.atlasTextures[i] == null) continue;
+                        asset.atlasTextures[i].name = "DejaVuSans-Bold SDF Atlas " + i;
+                        AssetDatabase.AddObjectToAsset(asset.atlasTextures[i], asset);
+                    }
+                }
+
+                EditorUtility.SetDirty(asset);
+                AssetDatabase.SaveAssets();
+                return asset;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning("[BlockPuzzle] Tạo font asset lỗi: " + e.Message);
+                return null;
+            }
+        }
+
         /// <summary>Tạo (hoặc cập nhật) material chữ có viền, sao chép từ material của font mặc định.</summary>
         private static Material OutlineMaterial(string name, Color outline, float width)
         {
@@ -806,6 +922,12 @@ namespace BlockPuzzle.EditorTools
             {
                 mat = new Material(_font.material);
                 AssetDatabase.CreateAsset(mat, path);
+            }
+            else
+            {
+                // Font có thể đã đổi (vd. sang font tiếng Việt) nên làm mới atlas/shader từ material của font hiện tại
+                mat.shader = _font.material.shader;
+                mat.CopyPropertiesFromMaterial(_font.material);
             }
 
             mat.EnableKeyword("OUTLINE_ON");

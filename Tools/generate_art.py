@@ -133,47 +133,103 @@ def nine(img, border, size):
     return out
 
 
+def inner_shadow(img, mask, depth=6, strength=120, dy=3, color=(0, 0, 0)):
+    """Bóng lõm ở mép trên-trái bên trong mask (làm ô trống/khoảng lõm trông như khắc vào gỗ)."""
+    w, h = img.size
+    inv = Image.eval(mask, lambda v: 255 - v)
+    inv = inv.filter(ImageFilter.GaussianBlur(depth))
+    off = Image.new("L", (w, h), 255)
+    off.paste(inv, (0, dy))
+    a = (np.asarray(off, float) / 255.0) * (np.asarray(mask, float) / 255.0) * strength
+    layer = np.zeros((h, w, 4), np.uint8)
+    layer[..., 0], layer[..., 1], layer[..., 2] = color
+    layer[..., 3] = np.clip(a, 0, 255).astype(np.uint8)
+    return over(img, Image.fromarray(layer, "RGBA"))
+
+
+def rim_light(img, mask, strength=110, width=2, dy=-1, color=(255, 255, 255)):
+    """Viền sáng mảnh ở mép trên bên trong mask (ánh sáng từ trên chiếu xuống cạnh gờ)."""
+    w, h = img.size
+    inv = Image.eval(mask, lambda v: 255 - v).filter(ImageFilter.GaussianBlur(width))
+    off = Image.new("L", (w, h), 255)
+    off.paste(inv, (0, -dy))
+    a = (np.asarray(off, float) / 255.0) * (np.asarray(mask, float) / 255.0) * strength
+    layer = np.zeros((h, w, 4), np.uint8)
+    layer[..., 0], layer[..., 1], layer[..., 2] = color
+    layer[..., 3] = np.clip(a, 0, 255).astype(np.uint8)
+    return over(img, Image.fromarray(layer, "RGBA"))
+
+
 # ----------------------------------------------------------------------------- gạch
+def grain_arr(w, h, fine=14, band=9, wavy=6):
+    """Vân gỗ ngang kiểu ván gỗ thật: sợi mảnh dày đặc + dải sáng/tối + vài đường vân uốn lượn."""
+    fine_l = noise_arr(w, h, 120, 1) * fine                      # sợi mảnh, mỗi hàng một giá trị
+    band_l = noise_arr(w, h, 160, 9) * band                      # dải sáng tối chậm
+    yy, xx = np.mgrid[0:h, 0:w]
+    ph = rng.uniform(0, 6.28)
+    wave = np.sin((yy + np.sin(xx / w * 5 + ph) * 3.5) / 3.1 + ph)   # đường vân hơi uốn
+    wave_l = np.where(wave > 0.78, -1.0, 0.0) * wavy                 # chỉ vài đường tối mảnh
+    return fine_l + band_l + wave_l
+
+
 def make_cell():
+    """Ô gạch gỗ sáng như ván gỗ phong: viền nâu mảnh, mặt có vân ngang rõ, vát cạnh sáng trên / tối dưới.
+    Vẽ bằng xám/trắng để SpriteRenderer.color tô màu (tông gỗ, xanh ngọc...)."""
     W = 128
     img = Image.new("RGBA", (W, W), (0, 0, 0, 0))
-    img = over(img, solid(W, W, 24, 3, vgrad(W, W, (205, 205, 205), (140, 140, 140))))   # viền tối
-    face_mask = rr_mask(W, W, 18, 9)
-    face = vgrad(W, W, (255, 255, 255), (226, 226, 226)) + \
-        (noise_arr(W, W, 22, 22) * 7)[..., None]                                          # vân đá nhẹ
+    outline_mask = rr_mask(W, W, 11, 2)
+    img = over(img, fill(vgrad(W, W, (118, 118, 118), (96, 96, 96)), outline_mask))   # viền nâu mảnh sau khi tô màu
+    face_mask = rr_mask(W, W, 8, 6)
+    face = vgrad(W, W, (255, 255, 255), (236, 236, 236)) + grain_arr(W, W)[..., None]
     img = over(img, fill(face, face_mask))
-    # vệt sáng chéo như mặt gạch bóng
-    sh = Image.new("RGBA", (W, W), (0, 0, 0, 0))
-    ImageDraw.Draw(sh).polygon([(20, 18), (70, 18), (18, 70)], fill=(255, 255, 255, 80))
-    sh = sh.filter(ImageFilter.GaussianBlur(6))
-    sh.putalpha(Image.fromarray((np.asarray(sh.split()[3], float) *
-                                 np.asarray(face_mask, float) / 255).astype(np.uint8)))
-    img = over(img, sh)
-    # gờ sáng dưới đáy mặt gạch
-    edge = Image.new("RGBA", (W, W), (0, 0, 0, 0))
-    ImageDraw.Draw(edge).rounded_rectangle([9, 9, W - 10, W - 10], radius=18, outline=(255, 255, 255, 90), width=2)
-    img = over(img, edge)
+    img = rim_light(img, face_mask, strength=170, width=2, dy=-2)                       # cạnh trên sáng
+    img = inner_shadow(img, face_mask, depth=4, strength=95, dy=-3)                     # cạnh dưới tối
+    # cạnh trái sáng nhẹ, cạnh phải tối nhẹ để có cảm giác vát đều
+    edge = np.zeros((W, W, 4), np.uint8)
+    xx = np.arange(W)[None, :].repeat(W, 0)
+    left = np.clip(1 - (xx - 6) / 5.0, 0, 1)
+    right = np.clip(1 - (W - 7 - xx) / 5.0, 0, 1)
+    m = np.asarray(face_mask, float) / 255
+    edge[..., :3] = 255
+    edge[..., 3] = (left * m * 90).astype(np.uint8)
+    img = over(img, Image.fromarray(edge, "RGBA"))
+    edge2 = np.zeros((W, W, 4), np.uint8)
+    edge2[..., 3] = (right * m * 70).astype(np.uint8)
+    img = over(img, Image.fromarray(edge2, "RGBA"))
     save("cell_block", img, ppu=128)
 
 
 def make_empty_cell():
+    """Ô trống: gỗ tối có vân ngang, mép trên tối (hơi lõm), mép dưới có gờ sáng mảnh."""
     W = 128
     img = Image.new("RGBA", (W, W), (0, 0, 0, 0))
-    img = over(img, solid(W, W, 14, 3, vgrad(W, W, (38, 22, 13), (78, 48, 30))))
-    inner = vgrad(W, W, (56, 33, 20), (66, 40, 25)) + (noise_arr(W, W, 30, 30) * 3)[..., None]
-    img = over(img, fill(inner, rr_mask(W, W, 11, 8)))
+    outer = rr_mask(W, W, 11, 2)
+    img = over(img, fill(vgrad(W, W, (30, 17, 10), (84, 52, 32)), outer))
+    inner_mask = rr_mask(W, W, 8, 5)
+    inner = vgrad(W, W, (52, 31, 19), (66, 40, 25)) + grain_arr(W, W, 7, 4, 3)[..., None]
+    img = over(img, fill(inner, inner_mask))
+    img = inner_shadow(img, inner_mask, depth=5, strength=120, dy=4)
     save("cell_empty", img, ppu=128)
 
 
 # ----------------------------------------------------------------------------- bảng
 def make_board_frame():
     S = 256
-    outer = wood_arr(S, S, (222, 142, 66), (178, 104, 46))
-    img = plate(S, S, 52, ((236, 162, 80), (170, 98, 42)), None, 8, outline=(92, 50, 22),
+    outer = wood_arr(S, S, (226, 146, 68), (172, 100, 44), 0.12)
+    img = plate(S, S, 52, ((240, 168, 84), (164, 92, 40)), None, 8, outline=(88, 46, 20),
                 face_arr=outer, glossy=False)
-    # khoảng lõm chứa các ô: gờ sáng rồi nền nâu tối
-    img = over(img, solid(S, S, 24, 36, vgrad(S, S, (110, 62, 28), (240, 170, 90))))
-    img = over(img, solid(S, S, 22, 40, vgrad(S, S, (44, 26, 15), (60, 36, 22))))
+    # đường chạm khắc vàng nhạt chạy quanh khung
+    inlay = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    ImageDraw.Draw(inlay).rounded_rectangle([20, 20, S - 21, S - 21], radius=36,
+                                            outline=(255, 214, 140, 150), width=2)
+    img = over(img, inlay)
+    # khoảng lõm chứa các ô: gờ sáng rồi nền nâu tối có bóng đổ vào trong
+    img = over(img, solid(S, S, 24, 36, vgrad(S, S, (96, 54, 24), (246, 178, 96))))
+    pit_mask = rr_mask(S, S, 22, 40)
+    img = over(img, fill(vgrad(S, S, (44, 26, 15), (60, 36, 22)), pit_mask))
+    img = inner_shadow(img, pit_mask, depth=10, strength=170, dy=6)
+    # ánh sáng từ trên chiếu lên mép khung
+    img = rim_light(img, rr_mask(S, S, 48, 4), strength=70, width=3, dy=-2, color=(255, 236, 190))
     save("board_frame", img, ppu=128, border=(64, 64, 64, 64))
 
 
@@ -184,6 +240,7 @@ def make_hud():
     p = plate(256, 128, 34, ((228, 160, 60), (160, 96, 28)), None, 9, outline=(86, 48, 14),
               face_arr=green, glossy=False)
     p = over(p, gloss(Image.new("RGBA", (256, 128), (0, 0, 0, 0)), rr_mask(256, 128, 25, 12), 38, 0.5))
+    p = inner_shadow(p, rr_mask(256, 128, 25, 12), depth=6, strength=110, dy=4)
     save("hud_panel_best", p, border=(44, 44, 44, 44))
 
     # Khung điểm hiện tại: gỗ tối, viền sáng phát sáng nhẹ
@@ -193,6 +250,7 @@ def make_hud():
     glow = Image.new("RGBA", (256, 128), (0, 0, 0, 0))
     ImageDraw.Draw(glow).rounded_rectangle([2, 2, 253, 125], radius=34, outline=(255, 170, 220, 255), width=6)
     glow = glow.filter(ImageFilter.GaussianBlur(5))
+    q = inner_shadow(q, rr_mask(256, 128, 27, 9), depth=6, strength=120, dy=4)
     q = over(glow, q)
     save("hud_panel_score", q, border=(44, 44, 44, 44))
 
@@ -338,14 +396,34 @@ def make_fx():
     arr[..., 3] = (a * 255).astype(np.uint8)
     save("fx_streak", Image.fromarray(arr, "RGBA"), ppu=128)
 
+    # Hạt bụi sáng mềm cho không khí nền (tròn, mờ dần ra rìa)
+    N = 32
+    yy, xx = np.mgrid[0:N, 0:N]
+    r = np.sqrt(((xx - (N - 1) / 2) / (N / 2)) ** 2 + ((yy - (N - 1) / 2) / (N / 2)) ** 2)
+    a = np.clip(1 - r, 0, 1) ** 1.8
+    arr = np.zeros((N, N, 4), np.uint8)
+    arr[..., 0], arr[..., 1], arr[..., 2] = 255, 236, 190
+    arr[..., 3] = (a * 255).astype(np.uint8)
+    save("fx_mote", Image.fromarray(arr, "RGBA"), ppu=128)
+
 
 # ----------------------------------------------------------------------------- nền
 def make_background():
+    """Nền ván gỗ ghép dọc, có khe giữa các ván, ánh sáng ấm ở giữa-trên và tối dần ở rìa."""
     W, H = 512, 1024
-    arr = wood_arr(W, H, (204, 128, 62), (178, 104, 48), 0.11)
+    arr = wood_arr(W, H, (206, 130, 64), (176, 102, 46), 0.11)
+    # chia thành 4 ván, mỗi ván lệch tông một chút
+    plank_w = W // 4
+    for i in range(4):
+        shade = 1 + rng.uniform(-0.05, 0.05)
+        arr[:, i * plank_w:(i + 1) * plank_w] *= shade
+    for i in range(1, 4):                      # khe tối + gờ sáng bên cạnh
+        x = i * plank_w
+        arr[:, x - 1:x + 1] *= 0.55
+        arr[:, x + 1:x + 3] *= 1.07
     yy, xx = np.mgrid[0:H, 0:W]
-    d = np.sqrt(((xx - W / 2) / (W / 2)) ** 2 + ((yy - H / 2) / (H / 2)) ** 2)
-    arr *= (1 - 0.20 * np.clip(d - 0.5, 0, 1))[..., None]  # tối dần ở rìa
+    d = np.sqrt(((xx - W / 2) / (W / 2)) ** 2 + ((yy - H * 0.38) / (H * 0.62)) ** 2)
+    arr *= (1.10 - 0.34 * np.clip(d - 0.25, 0, 1))[..., None]     # sáng giữa-trên, tối dần ra rìa
     img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGB").convert("RGBA")
     save("bg_wood", img, ppu=100)
 
@@ -368,7 +446,7 @@ def make_preview():
         a[..., 0] *= rgb[0]; a[..., 1] *= rgb[1]; a[..., 2] *= rgb[2]
         return Image.fromarray(a.astype(np.uint8), "RGBA")
 
-    gold = tint(block, (1.0, 0.86, 0.50)).resize((88, 88), Image.LANCZOS)
+    gold = tint(block, (0.97, 0.79, 0.54)).resize((88, 88), Image.LANCZOS)
     jade = tint(block, (0.52, 0.86, 0.68)).resize((88, 88), Image.LANCZOS)
     ox, oy = 60 + 38, 380 + 38
     layout = {(0, 0): "g", (1, 0): "g", (0, 1): "j", (1, 1): "j", (2, 0): "g", (3, 0): "g", (4, 3): "j"}

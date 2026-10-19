@@ -5,7 +5,7 @@ namespace BlockPuzzle
 {
     /// <summary>
     /// Rung camera. Gắn vào Main Camera. Chỉ rung thế giới game, HUD (Canvas Overlay) đứng yên
-    /// nên chữ vẫn dễ đọc. Có công tắc để sau này nối với màn cài đặt.
+    /// nên chữ vẫn dễ đọc. Người chơi tắt được trong Cài đặt (GameSettings.ShakeOn).
     /// </summary>
     public class ScreenShake : MonoBehaviour
     {
@@ -26,7 +26,7 @@ namespace BlockPuzzle
         /// <summary>Rung với biên độ (đơn vị World) và thời gian cho trước, tắt dần về 0.</summary>
         public void Shake(float strength, float duration)
         {
-            if (!shakeEnabled || strength <= 0f) return;
+            if (!shakeEnabled || !GameSettings.ShakeOn || strength <= 0f) return;
 
             transform.DOKill();
             transform.position = _home; // về chỗ cũ trước khi rung lần mới, tránh lệch dần

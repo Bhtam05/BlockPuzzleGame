@@ -80,6 +80,22 @@ namespace BlockPuzzle
             transform.DOScale(trayScale, 0.25f).SetEase(Ease.OutBack);
         }
 
+        /// <summary>
+        /// Hủy thao tác kéo đang diễn ra (khối bay về khay). Gọi khi Pause hoặc app ra nền,
+        /// vì lúc đó Android có thể không gửi sự kiện nhả tay nên khối sẽ kẹt và chặn mọi lần kéo sau.
+        /// </summary>
+        public static void CancelActiveDrag()
+        {
+            BlockPiece p = s_active;
+            if (p == null) return;
+
+            p._dragging = false;
+            s_active = null;
+            p._grid.HidePreview();
+            p._lastOrigin = new Vector2Int(int.MinValue, int.MinValue);
+            p.ReturnToTray();
+        }
+
         // ----------------------------------------------------------------- Input
 
         public void OnPointerDown(PointerEventData e)
@@ -89,6 +105,7 @@ namespace BlockPuzzle
 
             s_active = this;
             _dragging = true;
+            AudioManager.Play(Sfx.Pick);
 
             transform.DOKill();
             SetSorting(dragSortingOrder);

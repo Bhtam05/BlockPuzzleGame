@@ -113,6 +113,31 @@ namespace BlockPuzzle
             UpdateComboUI();
         }
 
+        /// <summary>Lấy trạng thái điểm để lưu ván đang chơi.</summary>
+        public void ExportState(out int score, out int streak, out int movesWithoutClear)
+        {
+            score = Score;
+            streak = ComboStreak;
+            movesWithoutClear = _movesWithoutClear;
+        }
+
+        /// <summary>Khôi phục điểm và combo từ ván đã lưu (không chạy animation, không đụng high score đã lưu).</summary>
+        public void ImportState(int score, int streak, int movesWithoutClear)
+        {
+            Score = Mathf.Max(0, score);
+            ComboStreak = Mathf.Max(0, streak);
+            _movesWithoutClear = Mathf.Clamp(movesWithoutClear, 0, comboGraceMoves);
+
+            if (Score > HighScore)
+            {
+                HighScore = Score;
+                PlayerPrefs.SetInt(HighScoreKey, HighScore);
+            }
+
+            RefreshUI(true);
+            UpdateComboUI();
+        }
+
         public void SaveHighScore() => PlayerPrefs.Save();
 
         // ----------------------------------------------------------------- UI

@@ -28,6 +28,7 @@ namespace BlockPuzzle.EditorTools
             PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             done.Add("Scripting Backend = IL2CPP, kiến trúc ARM64");
+            done.Add("Quyền rung (VIBRATE): Unity tự thêm vào AndroidManifest khi build");
 
             // 3) Thêm scene đang mở vào danh sách build
             Scene scene = SceneManager.GetActiveScene();

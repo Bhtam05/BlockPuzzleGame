@@ -6,6 +6,7 @@ namespace BlockPuzzle
 {
     public enum GameState
     {
+        Menu,
         Playing,
         Paused,
         GameOver
@@ -32,6 +33,11 @@ namespace BlockPuzzle
         [Header("Pause UI")]
         [SerializeField] private GameObject pausePanel;
 
+        [Header("Menu chính")]
+        [Tooltip("Màn hình khởi đầu (Bắt đầu / Cài đặt). Để trống thì vào thẳng ván chơi.")]
+        [SerializeField] private GameObject menuPanel;
+        [SerializeField] private GameObject settingsPanel;
+
         [Header("Hiệu ứng")]
         [SerializeField] private ClearEffects effects;
 
@@ -41,7 +47,7 @@ namespace BlockPuzzle
 
         private Tween _gameOverCall;
 
-        public GameState State { get; private set; } = GameState.Playing;
+        public GameState State { get; private set; } = GameState.Menu;
         public bool IsPlaying => State == GameState.Playing;
 
         private void Awake()
@@ -59,7 +65,8 @@ namespace BlockPuzzle
 
         private void Start()
         {
-            if (!TryRestoreGame()) StartGame();
+            if (menuPanel != null) ShowMenu();
+            else if (!TryRestoreGame()) StartGame();
         }
 
         private void Update()
@@ -69,6 +76,10 @@ namespace BlockPuzzle
             // Nút Back của Android (cũng là phím Esc trên máy tính)
             switch (State)
             {
+                case GameState.Menu:
+                    if (settingsPanel != null && settingsPanel.activeSelf) CloseSettings();
+                    else Application.Quit();
+                    break;
                 case GameState.Playing: Pause(); break;
                 case GameState.Paused: Resume(); break;
                 case GameState.GameOver: Application.Quit(); break;
@@ -96,10 +107,64 @@ namespace BlockPuzzle
             if (!paused) return;
             score.SaveHighScore();
             SaveProgress();
-            PauseSilently();
+            PauseSilently(); // chỉ có tác dụng khi đang Playing
         }
 
         private void OnApplicationQuit() => SaveProgress();
+
+        // ----------------------------------------------------------------- Menu chính
+
+        /// <summary>Hiện màn hình khởi đầu. Ván đang chơi dở (nếu có) đã được lưu để Bắt đầu chơi tiếp.</summary>
+        private void ShowMenu()
+        {
+            _gameOverCall?.Kill();
+            BlockPiece.CancelActiveDrag();
+
+            State = GameState.Menu;
+            if (gameOverPanel != null) gameOverPanel.SetActive(false);
+            if (pausePanel != null) pausePanel.SetActive(false);
+            if (settingsPanel != null) settingsPanel.SetActive(false);
+            if (menuPanel != null) menuPanel.SetActive(true);
+        }
+
+        /// <summary>Gắn vào nút Bắt đầu: chơi tiếp ván đã lưu, không có thì mở ván mới.</summary>
+        public void PlayGame()
+        {
+            if (State != GameState.Menu) return;
+
+            AudioManager.Play(Sfx.Click);
+            if (menuPanel != null) menuPanel.SetActive(false);
+            if (!TryRestoreGame()) StartGame();
+        }
+
+        /// <summary>Gắn vào nút Trang chủ (trong Tạm dừng và Game Over): lưu ván rồi về menu.</summary>
+        public void GoHome()
+        {
+            if (menuPanel == null) return;
+
+            AudioManager.Play(Sfx.Click);
+            SaveProgress(); // trước khi đổi State
+            score.SaveHighScore();
+            ShowMenu();
+        }
+
+        /// <summary>Gắn vào nút Cài đặt ở menu.</summary>
+        public void OpenSettings()
+        {
+            if (State != GameState.Menu || settingsPanel == null) return;
+
+            AudioManager.Play(Sfx.Click);
+            settingsPanel.SetActive(true);
+        }
+
+        /// <summary>Gắn vào nút Quay lại trong màn Cài đặt.</summary>
+        public void CloseSettings()
+        {
+            if (settingsPanel == null) return;
+
+            AudioManager.Play(Sfx.Click);
+            settingsPanel.SetActive(false);
+        }
 
         // ----------------------------------------------------------------- Bắt đầu / khôi phục
 
@@ -109,6 +174,7 @@ namespace BlockPuzzle
             State = GameState.Playing;
             if (gameOverPanel != null) gameOverPanel.SetActive(false);
             if (pausePanel != null) pausePanel.SetActive(false);
+            if (menuPanel != null) menuPanel.SetActive(false);
 
             _gameOverCall?.Kill();
             GameSave.Clear();
@@ -151,7 +217,8 @@ namespace BlockPuzzle
 
         private void SaveProgress()
         {
-            if (!saveProgress || State == GameState.GameOver) return;
+            // Chỉ lưu khi đang có ván thật: ở menu bảng còn trống, lưu sẽ đè mất ván cũ
+            if (!saveProgress || (State != GameState.Playing && State != GameState.Paused)) return;
             if (grid == null || spawner == null || score == null) return;
             GameSave.Write(grid, spawner, score);
         }

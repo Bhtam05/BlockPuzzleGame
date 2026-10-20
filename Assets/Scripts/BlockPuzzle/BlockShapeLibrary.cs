@@ -46,6 +46,26 @@ namespace BlockPuzzle
             Add(list, "##.", ".##");
             Add(list, ".##", "##.");
 
+            // Các hình thêm sau: luôn nối vào CUỐI danh sách để chỉ số shape trong bản lưu ván cũ vẫn đúng.
+            // Chữ T (4 ô) - 4 hướng
+            Add(list, "###", ".#.");
+            Add(list, ".#.", "###");
+            Add(list, "#.", "##", "#.");
+            Add(list, ".#", "##", ".#");
+
+            // Dấu cộng (5 ô)
+            Add(list, ".#.", "###", ".#.");
+
+            // Chữ U (5 ô) - 4 hướng
+            Add(list, "#.#", "###");
+            Add(list, "###", "#.#");
+            Add(list, "##", "#.", "##");
+            Add(list, "##", ".#", "##");
+
+            // Đường chéo (2 ô) - 2 hướng
+            Add(list, "#.", ".#");
+            Add(list, ".#", "#.");
+
             return list;
         }
 

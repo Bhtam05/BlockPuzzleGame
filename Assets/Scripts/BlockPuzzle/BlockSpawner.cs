@@ -9,6 +9,8 @@ namespace BlockPuzzle
     /// Sinh 3 khối ngẫu nhiên vào 3 slot ở khay phía dưới.
     /// Khi dùng hết cả 3 khối thì GameManager gọi SpawnSet() để sinh bộ mới.
     /// Độ khó thích ứng: bảng càng đầy thì khối nhỏ, dễ đặt càng hay ra, khối lớn ít ra hơn.
+    /// Bộ 3 khối luôn giải được (mô phỏng đặt cả 3 theo một thứ tự nào đó, có tính xóa đường), và khi bảng
+    /// càng đầy thì càng hay có ít nhất một khối làm xóa được đường (SpawnPlanner).
     /// </summary>
     public class BlockSpawner : MonoBehaviour
     {
@@ -21,6 +23,14 @@ namespace BlockPuzzle
         [Tooltip("Số lần thử random để đảm bảo bộ khối có ít nhất 1 khối đặt được.")]
         [SerializeField] private int fairnessTries = 30;
         [SerializeField] private Camera cam;
+
+        [Header("Bộ khối hợp lý")]
+        [Tooltip("Bật: bộ 3 khối luôn đặt hết được (theo một thứ tự nào đó) nếu tồn tại bộ như vậy. Tắt: chỉ cần có ít nhất 1 khối đặt được.")]
+        [SerializeField] private bool guaranteeSolvable = true;
+        [Tooltip("Xác suất bộ khối có ít nhất một khối làm xóa được đường khi bảng còn thoáng.")]
+        [SerializeField, Range(0f, 1f)] private float lineHelpMin = 0.15f;
+        [Tooltip("Xác suất đó khi bảng đã gần đầy (từ Crowded Max trở lên).")]
+        [SerializeField, Range(0f, 1f)] private float lineHelpMax = 0.7f;
 
         [Header("Độ khó thích ứng")]
         [Tooltip("Bật: bảng càng đầy càng ưu tiên khối nhỏ. Tắt: random đều.")]
@@ -40,6 +50,12 @@ namespace BlockPuzzle
         private float[] _weights;
         private int _remaining;
 
+        // Chọn bộ khối hợp lý (tạo sẵn một lần, không cấp phát lúc chơi)
+        private SpawnPlanner _planner;
+        private bool[] _occupancy;
+        private int[] _bestIdx;
+        private int[] _fallbackIdx;
+
         /// <summary>Danh sách khối đang có (phần tử đã dùng sẽ là null).</summary>
         public IReadOnlyList<BlockPiece> Pieces => _pieces;
         public bool IsEmpty => _remaining == 0;
@@ -54,7 +70,12 @@ namespace BlockPuzzle
             _pieceShape = new int[slots.Length];
             _pickedIdx = new int[slots.Length];
             _weights = new float[shapes.Count];
+            _bestIdx = new int[slots.Length];
+            _fallbackIdx = new int[slots.Length];
             for (int i = 0; i < _pieceShape.Length; i++) _pieceShape[i] = -1;
+
+            _planner = new SpawnPlanner(grid.Width, grid.Height);
+            _occupancy = new bool[grid.Width * grid.Height];
         }
 
         /// <summary>Sinh bộ khối mới cho tất cả slot.</summary>
@@ -77,13 +98,31 @@ namespace BlockPuzzle
         // ----------------------------------------------------------------- Random
 
         /// <summary>
-        /// Random bộ khối. Thử tối đa fairnessTries lần để có ít nhất 1 khối còn đặt được
-        /// và không ra 3 khối giống hệt nhau, tránh game over vô lý ngay từ lúc sinh khối.
+        /// Chọn bộ khối. Thử tối đa fairnessTries lần random (theo trọng số độ khó), mỗi lần kiểm tra bằng mô phỏng:
+        /// 1) không ra 3 khối giống hệt nhau, 2) bộ khối phải giải được (đặt hết cả 3 theo một thứ tự nào đó),
+        /// 3) đôi khi (nhiều hơn khi bảng gần đầy) bắt buộc có một khối làm xóa được đường.
+        /// Không tìm được bộ giải được thì lùi về bộ có ít nhất một khối còn đặt được, cuối cùng mới chịu bộ bí
+        /// (Game Over thật, GameManager xử lý).
         /// </summary>
         private void PickShapes()
         {
-            float fill = adaptiveDifficulty ? grid.FillRatio : 0f;
-            BuildWeights(fill);
+            float fill = grid.FillRatio;
+            BuildWeights(adaptiveDifficulty ? fill : 0f);
+
+            bool usePlanner = guaranteeSolvable && slots.Length == 3;
+            bool wantLine = false;
+            if (usePlanner)
+            {
+                grid.CopyOccupancy(_occupancy);
+                _planner.Load(_occupancy);
+
+                float help = Mathf.Lerp(lineHelpMin, lineHelpMax,
+                    Mathf.InverseLerp(0.2f, Mathf.Max(0.21f, crowdedMax), fill));
+                wantLine = Random.value < help;
+            }
+
+            bool haveSolvable = false;   // _bestIdx: bộ giải được đầu tiên (dùng khi không tìm được bộ có khối xóa đường)
+            bool haveFallback = false;   // _fallbackIdx: bộ có ít nhất 1 khối đặt được
 
             for (int attempt = 0; attempt < fairnessTries; attempt++)
             {
@@ -97,9 +136,33 @@ namespace BlockPuzzle
                     if (!anyFits && grid.CanPlaceAnywhere(shapes[_pickedIdx[i]])) anyFits = true;
                 }
 
-                if (anyFits && !allSame) return;
+                if (allSame || !anyFits) continue;
+
+                if (!usePlanner) return; // chế độ cũ: chỉ cần có ít nhất 1 khối đặt được
+
+                if (!haveFallback)
+                {
+                    System.Array.Copy(_pickedIdx, _fallbackIdx, _pickedIdx.Length);
+                    haveFallback = true;
+                }
+
+                BlockShapeData a = shapes[_pickedIdx[0]], b = shapes[_pickedIdx[1]], c = shapes[_pickedIdx[2]];
+                if (!_planner.IsSolvable(a, b, c)) continue;
+
+                if (!wantLine) return; // bộ giải được là đủ
+
+                if (_planner.CanClearLine(a) || _planner.CanClearLine(b) || _planner.CanClearLine(c)) return;
+
+                if (!haveSolvable)
+                {
+                    System.Array.Copy(_pickedIdx, _bestIdx, _pickedIdx.Length);
+                    haveSolvable = true;
+                }
             }
-            // Hết lượt thử vẫn không có khối nào vừa -> bảng thật sự bí, để GameManager xử lý Game Over
+
+            // Hết lượt thử mà chưa chốt: dùng bộ giải được nếu có, không thì bộ còn đặt được, không thì để bộ cuối cùng
+            if (haveSolvable) System.Array.Copy(_bestIdx, _pickedIdx, _pickedIdx.Length);
+            else if (haveFallback) System.Array.Copy(_fallbackIdx, _pickedIdx, _pickedIdx.Length);
         }
 
         private void BuildWeights(float fill)

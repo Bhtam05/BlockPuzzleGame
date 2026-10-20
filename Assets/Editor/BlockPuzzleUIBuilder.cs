@@ -53,6 +53,12 @@ namespace BlockPuzzle.EditorTools
         private static string TxtMusic => Tx("Nhạc nền", "Music");
         private static string TxtHaptic => Tx("Rung", "Vibration");
         private static string TxtShake => Tx("Rung màn hình", "Screen shake");
+        // Tên game hiển thị ở menu chính: đổi chữ này rồi chạy lại Build UI
+        private const string TxtGameName = "BLOCK PUZZLE";
+        private static string TxtStart => Tx("BẮT ĐẦU", "START");
+        private static string TxtSettings => Tx("CÀI ĐẶT", "SETTINGS");
+        private static string TxtHome => Tx("TRANG CHỦ", "HOME");
+        private static string TxtBack => Tx("QUAY LẠI", "BACK");
 
         // ------------------------------------------------------------------ Bố cục World (đơn vị Unity)
         // Camera luôn thấy tối thiểu 17 đơn vị chiều cao nên các số này đúng với mọi màn hình dọc.
@@ -554,21 +560,40 @@ namespace BlockPuzzle.EditorTools
             Place(combo.rectTransform, TC, TC, new Vector2(0f, -352f), new Vector2(320f, 80f));
 
             // ---- Popup (nằm trên cùng, vẽ sau HUD)
-            BuildGameOverPopup(canvasGo.transform, gm, outRed, outBrown);
+            BuildMenuScreen(canvasGo.transform, gm, outGreen, outBrown);
+            BuildGameOverPopup(canvasGo.transform, gm, outRed, outBrown, outGreen);
             BuildPausePopup(canvasGo.transform, gm, outGreen, outBrown, outRed);
+            BuildSettingsPopup(canvasGo.transform, gm, outGreen, outBrown, outRed);
 
             // ---- Gán tham chiếu UI cho ScoreManager
             SetRef(score, "scoreText", scoreValue);
             SetRef(score, "highScoreText", bestValue);
             SetRef(score, "comboText", combo);
+            ApplyScoreDefaults(score);
 
             return canvas;
         }
 
-        private static void BuildGameOverPopup(Transform parent, GameManager gm, Material outRed, Material outBrown)
+        /// <summary>
+        /// Đặt các thông số điểm về bộ mặc định mới (Inspector giữ giá trị cũ nên phải ghi đè một lần).
+        /// Muốn tự chỉnh thì sửa trong Inspector của ScoreManager sau khi chạy tool, hoặc bỏ dòng gọi hàm này.
+        /// </summary>
+        private static void ApplyScoreDefaults(ScoreManager score)
+        {
+            var so = new SerializedObject(score);
+            so.FindProperty("pointsPerCell").intValue = 5;
+            so.FindProperty("pointsPerLine").intValue = 40;
+            so.FindProperty("comboStep").floatValue = 0.25f;
+            so.FindProperty("maxMultiplier").floatValue = 5f;
+            so.FindProperty("comboGraceMoves").intValue = 4;
+            so.ApplyModifiedProperties();
+        }
+
+        private static void BuildGameOverPopup(Transform parent, GameManager gm, Material outRed, Material outBrown,
+            Material outGreen)
         {
             (RectTransform root, RectTransform window) = NewPopupShell(parent, "GameOverPanel",
-                new Vector2(760f, 880f), TxtGameOver, outRed);
+                new Vector2(760f, 1060f), TxtGameOver, outRed);
 
             TextMeshProUGUI cap1 = NewText("YourScoreCaption", window, TxtYourScore, 44f, Brown,
                 TextAlignmentOptions.Center, null);
@@ -596,6 +621,10 @@ namespace BlockPuzzle.EditorTools
             Place(replay.image.rectTransform, BC, BC, new Vector2(0f, 70f), new Vector2(520f, 150f));
             UnityEventTools.AddVoidPersistentListener(replay.onClick, gm.Restart);
 
+            Button home = NewButton("HomeButton", window, LoadSprite("btn_green"), TxtHome, 48f, outGreen);
+            Place(home.image.rectTransform, BC, BC, new Vector2(0f, 250f), new Vector2(440f, 130f));
+            UnityEventTools.AddVoidPersistentListener(home.onClick, gm.GoHome);
+
             SetRef(gm, "gameOverPanel", root.gameObject);
             SetRef(gm, "finalScoreText", finalScore);
             SetRef(gm, "finalBestText", finalBest);
@@ -605,7 +634,7 @@ namespace BlockPuzzle.EditorTools
             Material outTitle)
         {
             (RectTransform root, RectTransform window) = NewPopupShell(parent, "PausePanel",
-                new Vector2(760f, 1180f), TxtPaused, outTitle);
+                new Vector2(760f, 1360f), TxtPaused, outTitle);
 
             // Các công tắc cài đặt
             AddToggle(window, "SoundToggle", SettingKind.Sound, TxtSound, -200f, outBrown);
@@ -621,7 +650,68 @@ namespace BlockPuzzle.EditorTools
             Place(restart.image.rectTransform, TC, TC, new Vector2(0f, -940f), new Vector2(500f, 150f));
             UnityEventTools.AddVoidPersistentListener(restart.onClick, gm.Restart);
 
+            Button home = NewButton("HomeButton", window, LoadSprite("btn_green"), TxtHome, 56f, outGreen);
+            Place(home.image.rectTransform, TC, TC, new Vector2(0f, -1120f), new Vector2(500f, 150f));
+            UnityEventTools.AddVoidPersistentListener(home.onClick, gm.GoHome);
+
             SetRef(gm, "pausePanel", root.gameObject);
+        }
+
+        /// <summary>Menu chính: nền gỗ phủ kín màn hình, khung tên game, nút Bắt đầu và Cài đặt.</summary>
+        private static void BuildMenuScreen(Transform parent, GameManager gm, Material outGreen, Material outBrown)
+        {
+            RectTransform root = NewRect("MenuPanel", parent);
+            Stretch(root);
+
+            // Nền gỗ phủ kín, chặn chạm xuống ván chơi phía dưới
+            Image bg = NewImage("Background", root, LoadSprite("bg_wood"), null, true);
+            bg.preserveAspect = false;
+            Stretch(bg.rectTransform);
+
+            // Khung tên game
+            RectTransform title = NewImage("TitleWindow", root, LoadSprite("popup_panel")).rectTransform;
+            Place(title, TC, TC, new Vector2(0f, -470f), new Vector2(840f, 380f));
+
+            Image mascot = NewImage("Mascot", title, LoadSprite("mascot"));
+            Place(mascot.rectTransform, TC, BC, new Vector2(0f, -40f), new Vector2(300f, 235f));
+
+            TextMeshProUGUI name = NewText("GameName", title, TxtGameName, 120f, Brown,
+                TextAlignmentOptions.Center, null);
+            name.enableAutoSizing = true;
+            name.fontSizeMin = 60f;
+            name.fontSizeMax = 120f;
+            Place(name.rectTransform, MC, MC, new Vector2(0f, -30f), new Vector2(720f, 170f));
+
+            // Nút
+            Button start = NewButton("StartButton", root, LoadSprite("btn_green"), TxtStart, 64f, outGreen);
+            Place(start.image.rectTransform, MC, MC, new Vector2(0f, -140f), new Vector2(620f, 170f));
+            UnityEventTools.AddVoidPersistentListener(start.onClick, gm.PlayGame);
+
+            Button settings = NewButton("SettingsButton", root, LoadSprite("btn_gold"), TxtSettings, 64f, outBrown);
+            Place(settings.image.rectTransform, MC, MC, new Vector2(0f, -360f), new Vector2(620f, 170f));
+            UnityEventTools.AddVoidPersistentListener(settings.onClick, gm.OpenSettings);
+
+            root.gameObject.SetActive(false); // GameManager bật khi vào game
+            SetRef(gm, "menuPanel", root.gameObject);
+        }
+
+        /// <summary>Màn Cài đặt từ menu chính: 4 công tắc + nút Quay lại.</summary>
+        private static void BuildSettingsPopup(Transform parent, GameManager gm, Material outGreen, Material outBrown,
+            Material outTitle)
+        {
+            (RectTransform root, RectTransform window) = NewPopupShell(parent, "SettingsPanel",
+                new Vector2(760f, 1060f), TxtSettings, outTitle);
+
+            AddToggle(window, "SoundToggle", SettingKind.Sound, TxtSound, -200f, outBrown);
+            AddToggle(window, "MusicToggle", SettingKind.Music, TxtMusic, -326f, outBrown);
+            AddToggle(window, "HapticToggle", SettingKind.Haptic, TxtHaptic, -452f, outBrown);
+            AddToggle(window, "ShakeToggle", SettingKind.Shake, TxtShake, -578f, outBrown);
+
+            Button back = NewButton("BackButton", window, LoadSprite("btn_green"), TxtBack, 56f, outGreen);
+            Place(back.image.rectTransform, TC, TC, new Vector2(0f, -790f), new Vector2(500f, 150f));
+            UnityEventTools.AddVoidPersistentListener(back.onClick, gm.CloseSettings);
+
+            SetRef(gm, "settingsPanel", root.gameObject);
         }
 
         /// <summary>Một hàng công tắc cài đặt: nút bản rộng, bật = xanh, tắt = gỗ.</summary>

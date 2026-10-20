@@ -24,7 +24,21 @@ namespace BlockPuzzle
         [SerializeField] private float trayScale = 0.6f;
         [Tooltip("Khối nổi lên trên ngón tay để không bị che.")]
         [SerializeField] private Vector2 liftOffset = new Vector2(0f, 1.8f);
-        [SerializeField] private float colliderPadding = 0.6f;
+        [Tooltip("Ngón tay kéo lên bao nhiêu thì khối đi lên gấp chừng đó lần (1 = đi cùng tốc độ). Giúp khối lên tới hàng trên cùng của bảng khi tay mới tới giữa màn hình.")]
+        [SerializeField, Range(1f, 2.5f)] private float verticalGain = 1.5f;
+        [Tooltip("Tương tự theo chiều ngang: tay kéo sang trái/phải bao nhiêu thì khối đi gấp chừng đó lần (1 = cùng tốc độ).")]
+        [SerializeField, Range(1f, 2.5f)] private float horizontalGain = 1.4f;
+        [Tooltip("Khối được dịch thêm tối đa bao nhiêu unit sang hai bên nhờ horizontalGain.")]
+        [SerializeField] private float maxExtraShift = 2.5f;
+        [Tooltip("Khối được nâng thêm tối đa bao nhiêu unit so với lift cơ bản nhờ verticalGain (giữ khối không bay quá xa tay).")]
+        [SerializeField] private float maxExtraLift = 4f;
+        [Header("Vùng chạm (đơn vị World, tính theo kích thước khối trong khay)")]
+        [Tooltip("Đệm thêm quanh khối khi còn nằm trong khay.")]
+        [SerializeField] private float hitPadding = 0.7f;
+        [Tooltip("Vùng chạm tối thiểu mỗi chiều, để khối nhỏ (1x1, 2x1) vẫn dễ bắt bằng ngón tay (3.0 = bằng khoảng cách 2 khối trong khay).")]
+        [SerializeField] private float minHitSize = 2.6f;
+        [Tooltip("Vùng chạm tối đa mỗi chiều, giữ dưới khoảng cách giữa 2 ô khay để không lấn sang khối bên cạnh.")]
+        [SerializeField] private float maxHitSize = 2.95f;
         [SerializeField] private int traySortingOrder = 10;
         [SerializeField] private int dragSortingOrder = 100;
 
@@ -36,6 +50,8 @@ namespace BlockPuzzle
         private Vector3 _homePosition;
         private Vector2 _pivot;
         private bool _dragging;
+        private float _startPointerX; // vị trí (world) của ngón tay lúc bắt đầu kéo
+        private float _startPointerY;
 
         private readonly List<SpriteRenderer> _renderers = new List<SpriteRenderer>();
         private Vector2Int _lastOrigin = new Vector2Int(int.MinValue, int.MinValue);
@@ -71,9 +87,12 @@ namespace BlockPuzzle
                 _renderers.Add(sr);
             }
 
-            // Vùng chạm rộng hơn khối một chút cho dễ bắt
-            _collider.size = new Vector2(size.x * grid.CellSize + colliderPadding,
-                                         size.y * grid.CellSize + colliderPadding);
+            // Vùng chạm tính theo kích thước thật trên màn hình (khối trong khay bị scale nhỏ lại trayScale),
+            // có đệm và có mức tối thiểu để khối nhỏ vẫn dễ bắt, nhưng không vượt khoảng cách giữa các ô khay.
+            float scale = Mathf.Max(0.01f, trayScale);
+            float worldW = Mathf.Clamp(size.x * grid.CellSize * scale + hitPadding, minHitSize, Mathf.Max(minHitSize, maxHitSize));
+            float worldH = Mathf.Clamp(size.y * grid.CellSize * scale + hitPadding, minHitSize, Mathf.Max(minHitSize, maxHitSize));
+            _collider.size = new Vector2(worldW / scale, worldH / scale);
 
             transform.position = homePosition;
             transform.localScale = Vector3.zero;
@@ -110,13 +129,16 @@ namespace BlockPuzzle
             transform.DOKill();
             SetSorting(dragSortingOrder);
             transform.DOScale(1f, 0.1f).SetEase(Ease.OutQuad);
-            transform.position = PointerToWorld(e) + (Vector3)liftOffset;
+            Vector3 start = PointerToWorld(e);
+            _startPointerX = start.x;
+            _startPointerY = start.y;
+            transform.position = DragPosition(e);
         }
 
         public void OnDrag(PointerEventData e)
         {
             if (!_dragging) return;
-            transform.position = PointerToWorld(e) + (Vector3)liftOffset;
+            transform.position = DragPosition(e);
             UpdatePreview();
         }
 
@@ -187,6 +209,23 @@ namespace BlockPuzzle
         private void SetSorting(int order)
         {
             for (int i = 0; i < _renderers.Count; i++) _renderers[i].sortingOrder = order;
+        }
+
+        /// <summary>
+        /// Vị trí khối khi kéo = ngón tay + lift cơ bản + phần nâng/dịch thêm tăng dần khi tay đi xa điểm bắt đầu.
+        /// Nhờ vậy tay chỉ cần tới khoảng giữa màn hình mà khối đã lên được hàng trên cùng của bảng.
+        /// </summary>
+        private Vector3 DragPosition(PointerEventData e)
+        {
+            Vector3 p = PointerToWorld(e);
+            float rise = Mathf.Max(0f, p.y - _startPointerY);
+            float extra = Mathf.Min(maxExtraLift, rise * (verticalGain - 1f));
+
+            // Ngang: dịch thêm theo hướng tay đang đi, tối đa maxExtraShift
+            float dx = p.x - _startPointerX;
+            float shift = Mathf.Clamp(dx * (horizontalGain - 1f), -maxExtraShift, maxExtraShift);
+
+            return p + (Vector3)liftOffset + new Vector3(shift, extra, 0f);
         }
 
         private Vector3 PointerToWorld(PointerEventData e)

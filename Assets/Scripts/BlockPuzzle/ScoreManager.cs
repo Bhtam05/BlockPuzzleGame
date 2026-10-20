@@ -10,7 +10,7 @@ namespace BlockPuzzle
     /// - Mỗi ô đặt xuống: pointsPerCell điểm (không nhân combo).
     /// - Xóa n đường cùng lúc: pointsPerLine * n * n (xóa nhiều càng lợi), nhân hệ số combo.
     /// - Chuỗi combo (ComboStreak) tăng 1 mỗi lượt có xóa đường. Lượt không xóa chưa làm mất chuỗi:
-    ///   chỉ khi có comboGraceMoves lượt đặt liên tiếp không xóa (mặc định 3, tức một bộ khối) thì chuỗi về 0.
+    ///   chỉ khi có comboGraceMoves lượt đặt liên tiếp không xóa (mặc định 4) thì chuỗi về 0.
     /// - Hệ số = 1 + chuỗi * comboStep, tối đa maxMultiplier. Hệ số hiển thị trên HUD chính là hệ số
     ///   sẽ áp cho lần xóa kế tiếp, nên lần xóa đầu tiên chưa có thưởng (x1.0).
     /// </summary>
@@ -22,13 +22,13 @@ namespace BlockPuzzle
         [SerializeField] private TMP_Text comboText;
 
         [Header("Cấu hình điểm")]
-        [SerializeField] private int pointsPerCell = 1;
-        [SerializeField] private int pointsPerLine = 10;
-        [SerializeField] private float comboStep = 0.1f;
+        [SerializeField] private int pointsPerCell = 5;
+        [SerializeField] private int pointsPerLine = 40;
+        [SerializeField] private float comboStep = 0.25f;
         [Tooltip("Hệ số combo tối đa, để điểm không phình vô hạn.")]
-        [SerializeField] private float maxMultiplier = 3f;
-        [Tooltip("Số lượt đặt khối liên tiếp không xóa được thì chuỗi combo bị reset (3 = một bộ khối).")]
-        [SerializeField, Min(1)] private int comboGraceMoves = 3;
+        [SerializeField] private float maxMultiplier = 5f;
+        [Tooltip("Số lượt đặt khối liên tiếp không xóa được thì chuỗi combo bị reset (4 = hơn một bộ khối).")]
+        [SerializeField, Min(1)] private int comboGraceMoves = 4;
 
         private const string HighScoreKey = "BP_HighScore";
 

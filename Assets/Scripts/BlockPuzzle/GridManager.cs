@@ -292,6 +292,14 @@ namespace BlockPuzzle
             }
         }
 
+        /// <summary>Chép trạng thái bảng vào mảng phẳng (chỉ số y * width + x, true = có gạch). Dùng cho SpawnPlanner.</summary>
+        public void CopyOccupancy(bool[] buffer)
+        {
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                    buffer[y * width + x] = _grid[x, y] != 0;
+        }
+
         /// <summary>Tỉ lệ bảng đã lấp đầy, 0..1 (dùng chỉnh độ khó khi sinh khối).</summary>
         public float FillRatio => (float)FilledCount / (width * height);
 

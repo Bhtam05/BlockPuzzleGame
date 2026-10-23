@@ -179,6 +179,126 @@
         0,
         0
       ]
+    },
+    {
+      "name": "cell_grass",
+      "ppu": 128,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "cell_gem",
+      "ppu": 128,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "cell_melon",
+      "ppu": 128,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "cell_wool",
+      "ppu": 128,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "fx_cell_glow",
+      "ppu": 128,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "menu_bg",
+      "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "menu_vine_left",
+      "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "menu_vine_right",
+      "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "menu_bush",
+      "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "menu_sign",
+      "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "menu_plank",
+      "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "name": "menu_leaf",
+      "ppu": 100,
+      "border": [
+        0,
+        0,
+        0,
+        0
+      ]
     }
   ]
 }

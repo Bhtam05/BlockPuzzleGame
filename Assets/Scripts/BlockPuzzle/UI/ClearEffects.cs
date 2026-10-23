@@ -106,6 +106,36 @@ namespace BlockPuzzle
             }
         }
 
+        /// <summary>
+        /// Khi bảng đổi chất liệu: chùm tia lấp lánh bay lên từ khắp bảng + chữ tên chất liệu.
+        /// Chạy trễ một nhịp để khớp lúc các khối bắt đầu đổi.
+        /// </summary>
+        public void PlayThemeChange(string text, Color color)
+        {
+            if (grid == null) return;
+
+            DOVirtual.DelayedCall(0.35f, () =>
+            {
+                Vector3 c = grid.BoardCenter;
+                float halfW = grid.Width * grid.CellSize * 0.5f;
+                float halfH = grid.Height * grid.CellSize * 0.5f;
+
+                Color tint = Color.Lerp(color, Color.white, 0.5f);
+                for (int i = 0; i < 40; i++)
+                {
+                    Vector3 pos = c + new Vector3(Random.Range(-halfW, halfW), Random.Range(-halfH, halfH), 0f);
+                    Particle p = Spawn(Mode.Spark, sparkSprite, SortSpark, pos,
+                        Random.Range(0.5f, 0.9f), Random.Range(0.6f, 1.3f), tint);
+                    if (p == null) break;
+                    p.Vel = new Vector2(Random.Range(-0.5f, 0.5f), Random.Range(0.6f, 2.2f));
+                    p.Spin = Random.Range(-160f, 160f);
+                }
+
+                if (!string.IsNullOrEmpty(text))
+                    ShowPopup(text, c + Vector3.up * 1.6f, color, 1.5f);
+            }).SetTarget(this);
+        }
+
         /// <summary>Tắt ngay mọi hiệu ứng đang chạy (khi chơi lại).</summary>
         public void StopAll()
         {

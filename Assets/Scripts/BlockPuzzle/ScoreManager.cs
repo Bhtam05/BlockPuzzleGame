@@ -30,7 +30,7 @@ namespace BlockPuzzle
         [Tooltip("Số lượt đặt khối liên tiếp không xóa được thì chuỗi combo bị reset (4 = hơn một bộ khối).")]
         [SerializeField, Min(1)] private int comboGraceMoves = 4;
 
-        private const string HighScoreKey = "BP_HighScore";
+        public const string HighScoreKey = "BP_HighScore";
 
         public int Score { get; private set; }
         public int HighScore { get; private set; }

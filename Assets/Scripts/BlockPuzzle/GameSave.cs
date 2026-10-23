@@ -17,6 +17,8 @@ namespace BlockPuzzle
         public int score;
         public int streak;
         public int movesWithoutClear;
+        /// <summary>Seed chọn thứ tự chất liệu khối của ván (0 = bản lưu cũ chưa có).</summary>
+        public int themeSeed;
     }
 
     /// <summary>
@@ -28,7 +30,10 @@ namespace BlockPuzzle
         private const string Key = "BP_SaveGame";
         private const int Version = 1;
 
-        public static void Write(GridManager grid, BlockSpawner spawner, ScoreManager score)
+        /// <summary>Có ván đang chơi dở không (dùng cho nhãn nút ở menu).</summary>
+        public static bool Exists => PlayerPrefs.HasKey(Key);
+
+        public static void Write(GridManager grid, BlockSpawner spawner, ScoreManager score, BlockThemeManager themes)
         {
             var data = new GameSaveData
             {
@@ -42,6 +47,7 @@ namespace BlockPuzzle
             grid.ExportCells(data.cells);
             spawner.GetTrayState(data.tray);
             score.ExportState(out data.score, out data.streak, out data.movesWithoutClear);
+            data.themeSeed = themes != null ? themes.Seed : 0;
 
             PlayerPrefs.SetString(Key, JsonUtility.ToJson(data));
             PlayerPrefs.Save();

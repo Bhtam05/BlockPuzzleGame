@@ -23,6 +23,8 @@ namespace BlockPuzzle
         [SerializeField] private GridManager grid;
         [SerializeField] private BlockSpawner spawner;
         [SerializeField] private ScoreManager score;
+        [Tooltip("Đổi chất liệu khối theo mốc điểm. Để trống thì khối luôn là gỗ.")]
+        [SerializeField] private BlockThemeManager themes;
 
         [Header("Game Over UI")]
         [SerializeField] private GameObject gameOverPanel;
@@ -179,6 +181,7 @@ namespace BlockPuzzle
             _gameOverCall?.Kill();
             GameSave.Clear();
             if (effects != null) effects.StopAll();
+            if (themes != null) themes.NewGame();
             grid.ResetGrid();
             score.ResetScore();
             spawner.ClearAll();
@@ -202,6 +205,7 @@ namespace BlockPuzzle
             if (pausePanel != null) pausePanel.SetActive(false);
 
             if (effects != null) effects.StopAll();
+            if (themes != null) themes.Restore(data.themeSeed, data.score); // trước khi dựng khay và bảng để dùng đúng chất liệu
             spawner.ClearAll();
             if (!spawner.RestoreTray(data.tray))
             {
@@ -220,7 +224,7 @@ namespace BlockPuzzle
             // Chỉ lưu khi đang có ván thật: ở menu bảng còn trống, lưu sẽ đè mất ván cũ
             if (!saveProgress || (State != GameState.Playing && State != GameState.Paused)) return;
             if (grid == null || spawner == null || score == null) return;
-            GameSave.Write(grid, spawner, score);
+            GameSave.Write(grid, spawner, score, themes);
         }
 
         /// <summary>Gắn vào nút Replay trên UI.</summary>
@@ -290,6 +294,19 @@ namespace BlockPuzzle
             if (lines > 0 && effects != null) effects.PlayClear(grid.LastClear, gained, score.ComboStreak);
 
             spawner.Release(piece);
+
+            // Chạm mốc điểm: đổi chất liệu mọi khối (gợn sóng lan từ chỗ vừa đặt), trước khi sinh bộ khối mới
+            if (themes != null)
+            {
+                Vector2Int size = shape.Size;
+                Vector3 from = grid.GridToWorld(origin.x, origin.y) + new Vector3((size.x - 1) * 0.5f, (size.y - 1) * 0.5f, 0f) * grid.CellSize;
+                if (themes.OnScoreChanged(score.Score, from))
+                {
+                    AudioManager.Play(Sfx.LevelUp);
+                    Haptics.Clear(2);
+                }
+            }
+
             if (spawner.IsEmpty) spawner.SpawnSet();
 
             CheckGameOver();

@@ -228,6 +228,15 @@ namespace BlockPuzzle
             return true;
         }
 
+        // ----------------------------------------------------------------- Đổi chất liệu
+
+        /// <summary>Đổi chất liệu cho các khối còn trong khay (gọi khi bảng đổi chất liệu).</summary>
+        public void RefreshSkin(float baseDelay)
+        {
+            for (int i = 0; i < _pieces.Length; i++)
+                if (_pieces[i] != null) _pieces[i].RefreshSkin(baseDelay);
+        }
+
         // ----------------------------------------------------------------- Gỡ khối
 
         /// <summary>Gỡ khối đã đặt vào bảng.</summary>

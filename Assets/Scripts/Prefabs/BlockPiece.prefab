@@ -94,6 +94,12 @@ MonoBehaviour:
   cellPrefab: {fileID: 2984594562749429979, guid: e6baec15ec7a6e7419970ca55bb19b27, type: 3}
   trayScale: 0.6
   liftOffset: {x: 0, y: 1.8}
-  colliderPadding: 0.6
+  verticalGain: 1.5
+  horizontalGain: 1.4
+  maxExtraShift: 2.5
+  maxExtraLift: 4
+  hitPadding: 0.7
+  minHitSize: 2.6
+  maxHitSize: 2.95
   traySortingOrder: 10
   dragSortingOrder: 100

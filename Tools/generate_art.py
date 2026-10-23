@@ -428,6 +428,410 @@ def make_background():
     save("bg_wood", img, ppu=100)
 
 
+# ----------------------------------------------------------------------------- chất liệu khối mới
+def _bigdraw(W):
+    big = Image.new("RGB", (W * SS, W * SS), (0, 0, 0))
+    return big, ImageDraw.Draw(big, "RGBA")
+
+
+def _shrink(big, W):
+    return big.convert("RGBA").resize((W, W), Image.LANCZOS)
+
+
+def _finish_cell(face, W, outline_col, outline_arr_top=None, bevel=True, r_out=11, r_face=8, inset_face=6):
+    """Ghép viền + mặt (face là ảnh RGBA đã vẽ) vào khung ô bo góc chuẩn 128px, thêm vát cạnh."""
+    img = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    img = over(img, fill(vgrad(W, W, outline_col[0], outline_col[1]), rr_mask(W, W, r_out, 2)))
+    face_mask = rr_mask(W, W, r_face, inset_face)
+    f = face.copy()
+    a = np.asarray(f.split()[3], float) * np.asarray(face_mask, float) / 255.0
+    f.putalpha(Image.fromarray(a.astype(np.uint8)))
+    img = over(img, f)
+    if bevel:
+        img = rim_light(img, face_mask, strength=120, width=2, dy=-2)
+        img = inner_shadow(img, face_mask, depth=4, strength=80, dy=-3)
+    return img
+
+
+def make_cell_grass():
+    """Ô cỏ: thảm cỏ xanh có ngọn cỏ dày, vài bông hoa nhỏ, viền xanh đậm."""
+    W = 128
+    base = fill(vgrad(W, W, (150, 214, 88), (96, 170, 58)) + noise_arr(W, W, 10, 10)[..., None] * 10,
+                Image.new("L", (W, W), 255))
+    big = base.convert("RGB").resize((W * SS, W * SS), Image.LANCZOS)
+    d = ImageDraw.Draw(big, "RGBA")
+    r = np.random.default_rng(21)
+    for _ in range(260):   # ngọn cỏ: nét ngắn hơi nghiêng, mảnh sáng + mảnh tối
+        x = r.uniform(4, W - 4); y = r.uniform(8, W - 2)
+        L = r.uniform(7, 15); lean = r.uniform(-3.5, 3.5)
+        tone = r.random()
+        col = (210, 245, 120, 190) if tone > 0.55 else (52, 120, 40, 170)
+        d.line([(x * SS, y * SS), ((x + lean) * SS, (y - L) * SS)], fill=col, width=int(r.uniform(1.4, 2.4) * SS))
+    for (fx, fy, c) in [(30, 40, (255, 250, 235)), (92, 76, (255, 220, 90)), (62, 102, (255, 250, 235)), (100, 28, (255, 190, 210))]:
+        for k in range(5):   # bông hoa 5 cánh
+            ang = k * 1.2566
+            d.ellipse([(fx + math.cos(ang) * 4 - 3) * SS, (fy + math.sin(ang) * 4 - 3) * SS,
+                       (fx + math.cos(ang) * 4 + 3) * SS, (fy + math.sin(ang) * 4 + 3) * SS], fill=c + (255,))
+        d.ellipse([(fx - 2.4) * SS, (fy - 2.4) * SS, (fx + 2.4) * SS, (fy + 2.4) * SS], fill=(240, 160, 40, 255))
+    img = _finish_cell(_shrink(big, W), W, ((60, 110, 40), (38, 86, 34)))
+    save("cell_grass", img, ppu=128)
+
+
+def make_cell_gem():
+    """Ô đá quý: viên ngọc cắt mặt xanh lam, có mặt sáng/tối và đốm lấp lánh."""
+    W = 128
+    big, d = _bigdraw(W)
+    S = SS
+    d.rectangle([0, 0, W * S, W * S], fill=(70, 160, 235, 255))
+    c = W / 2
+    inner = 30   # hình vuông giữa
+    def P(pts, col): d.polygon([(x * S, y * S) for x, y in pts], fill=col)
+    # bốn mặt nghiêng từ viền vào khung giữa
+    P([(0, 0), (W, 0), (W - inner, inner), (inner, inner)], (190, 236, 255, 255))     # trên: sáng nhất
+    P([(0, 0), (inner, inner), (inner, W - inner), (0, W)], (110, 196, 248, 255))     # trái
+    P([(W, 0), (W, W), (W - inner, W - inner), (W - inner, inner)], (36, 96, 190, 255))  # phải: tối
+    P([(0, W), (W, W), (W - inner, W - inner), (inner, W - inner)], (26, 70, 156, 255))  # dưới: tối nhất
+    P([(inner, inner), (W - inner, inner), (W - inner, W - inner), (inner, W - inner)], (84, 178, 246, 255))  # mặt giữa
+    # mặt nhỏ trong mặt giữa tạo cảm giác cắt kim cương
+    P([(inner, inner), (W - inner, inner), (c, c)], (170, 228, 255, 255))
+    P([(inner, inner), (c, c), (inner, W - inner)], (120, 205, 250, 255))
+    P([(W - inner, inner), (W - inner, W - inner), (c, c)], (52, 128, 214, 255))
+    P([(inner, W - inner), (c, c), (W - inner, W - inner)], (40, 108, 198, 255))
+    for a, b in [((0, 0), (inner, inner)), ((W, 0), (W - inner, inner)), ((0, W), (inner, W - inner)), ((W, W), (W - inner, W - inner))]:
+        d.line([(a[0] * S, a[1] * S), (b[0] * S, b[1] * S)], fill=(255, 255, 255, 90), width=2 * S)
+    face = _shrink(big, W)
+    img = _finish_cell(face, W, ((24, 44, 120), (16, 30, 96)), r_face=9)
+    # lấp lánh trắng
+    spark = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    ds = ImageDraw.Draw(spark, "RGBA")
+    for (sx, sy, sz) in [(34, 30, 9), (92, 92, 6)]:
+        ds.polygon([(sx, sy - sz), (sx + sz * 0.28, sy - sz * 0.28), (sx + sz, sy), (sx + sz * 0.28, sy + sz * 0.28),
+                    (sx, sy + sz), (sx - sz * 0.28, sy + sz * 0.28), (sx - sz, sy), (sx - sz * 0.28, sy - sz * 0.28)],
+                   fill=(255, 255, 255, 240))
+    img = over(img, spark.filter(ImageFilter.GaussianBlur(0.6)))
+    save("cell_gem", img, ppu=128)
+
+
+def make_cell_melon():
+    """Ô dưa hấu: ruột đỏ hồng, hạt đen, vòng vỏ trắng xanh nhạt rồi vỏ xanh sọc."""
+    W = 128
+    big, d = _bigdraw(W)
+    S = SS
+    d.rectangle([0, 0, W * S, W * S], fill=(255, 84, 100, 255))
+    # ruột: gradient tâm sáng hơn
+    for k in range(18, 0, -1):
+        t = k / 18.0
+        col = (int(255 - 20 * t), int(150 - 70 * t), int(150 - 55 * t), 255)
+        m = 6 + (1 - t) * 26
+        d.rounded_rectangle([m * S, m * S, (W - m) * S, (W - m) * S], radius=int((10 + (1 - t) * 6) * S), fill=col)
+    # vòng vỏ trắng + xanh nhạt + sọc xanh đậm
+    ring = Image.new("RGBA", (W * S, W * S), (0, 0, 0, 0))
+    dr = ImageDraw.Draw(ring, "RGBA")
+    dr.rectangle([0, 0, W * S, W * S], fill=(46, 140, 70, 255))                                   # vỏ ngoài
+    r2 = np.random.default_rng(5)
+    for xx in range(-W, W * 2, 18):                                                               # sọc xiên
+        dr.polygon([(xx * S, 0), ((xx + 7) * S, 0), ((xx + 7 - 40) * S, W * S), ((xx - 40) * S, W * S)], fill=(26, 98, 50, 120))
+    dr.rounded_rectangle([7 * S, 7 * S, (W - 7) * S, (W - 7) * S], radius=12 * S, fill=(214, 240, 178, 255))   # vỏ trắng
+    dr.rounded_rectangle([12 * S, 12 * S, (W - 12) * S, (W - 12) * S], radius=10 * S, fill=(255, 255, 255, 0))
+    hole = Image.new("L", (W * S, W * S), 255)
+    ImageDraw.Draw(hole).rounded_rectangle([12 * S, 12 * S, (W - 12) * S, (W - 12) * S], radius=10 * S, fill=0)
+    ring.putalpha(hole)
+    big.paste(ring.convert("RGB"), (0, 0), ring.split()[3])
+    d = ImageDraw.Draw(big, "RGBA")
+    for (hx, hy, ang) in [(40, 44, 20), (82, 38, -25), (60, 66, 5), (36, 88, -15), (90, 84, 25), (62, 100, 0)]:
+        ca, sa = math.cos(math.radians(ang)), math.sin(math.radians(ang))
+        pts = []
+        for tt in np.linspace(0, 2 * math.pi, 18, endpoint=False):
+            lx, ly = math.cos(tt) * 4.2, math.sin(tt) * 7.0 * (0.6 + 0.4 * (math.sin(tt) < 0))
+            pts.append(((hx + lx * ca - ly * sa) * S, (hy + lx * sa + ly * ca) * S))
+        d.polygon(pts, fill=(36, 20, 24, 255))
+        d.ellipse([(hx - 1.6) * S, (hy - 3.5) * S, (hx - 0.2) * S, (hy - 1.8) * S], fill=(255, 255, 255, 110))
+    img = _finish_cell(_shrink(big, W), W, ((22, 78, 40), (16, 60, 34)), bevel=True)
+    save("cell_melon", img, ppu=128)
+
+
+def make_cell_wool():
+    """Ô vải len: các hàng mũi đan chữ V, sợi bông xù, màu hồng đào."""
+    W = 128
+    big, d = _bigdraw(W)
+    S = SS
+    d.rectangle([0, 0, W * S, W * S], fill=(232, 150, 190, 255))
+    r = np.random.default_rng(33)
+    cw, ch = 16, 14
+    for row in range(-1, W // ch + 2):
+        for col in range(-1, W // cw + 2):
+            x0 = col * cw + (cw // 2 if row % 2 else 0)
+            y0 = row * ch
+            tone = 1.0 + r.uniform(-0.05, 0.05)
+            hi = (int(min(255, 250 * tone)), int(min(255, 196 * tone)), int(min(255, 222 * tone)), 255)
+            lo = (196, 100, 150, 255)
+            # hai nét chéo tạo chữ V, nét sáng + bóng tối bên dưới
+            for (ax, ay, bx, by) in [(x0, y0, x0 + cw / 2, y0 + ch), (x0 + cw, y0, x0 + cw / 2, y0 + ch)]:
+                d.line([(ax * S, (ay + 2) * S), (bx * S, (by + 2) * S)], fill=lo, width=int(5.2 * S))
+                d.line([(ax * S, ay * S), (bx * S, by * S)], fill=hi, width=int(4.4 * S))
+                d.line([(ax * S, (ay - 1) * S), (bx * S, (by - 1) * S)], fill=(255, 226, 238, 150), width=int(1.4 * S))
+    face = _shrink(big, W)
+    # sợi bông li ti
+    arr = np.asarray(face, float)
+    arr[..., :3] += (r.normal(0, 7, (W, W))[..., None])
+    face = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGBA")
+    img = _finish_cell(face, W, ((170, 78, 128), (140, 60, 108)), r_out=12, r_face=10, inset_face=5)
+    # đường may viền ngoài (nét đứt sáng)
+    st = Image.new("RGBA", (W * SS, W * SS), (0, 0, 0, 0))
+    ds = ImageDraw.Draw(st, "RGBA")
+    m = 9 * SS
+    n = 15
+    for k in range(n):
+        t0, t1 = k / n, (k + 0.55) / n
+        for (p0, p1) in [((m + t0 * (W * SS - 2 * m), m), (m + t1 * (W * SS - 2 * m), m)),
+                         ((m + t0 * (W * SS - 2 * m), W * SS - m), (m + t1 * (W * SS - 2 * m), W * SS - m)),
+                         ((m, m + t0 * (W * SS - 2 * m)), (m, m + t1 * (W * SS - 2 * m))),
+                         ((W * SS - m, m + t0 * (W * SS - 2 * m)), (W * SS - m, m + t1 * (W * SS - 2 * m)))]:
+            ds.line([p0, p1], fill=(255, 245, 250, 200), width=int(2.2 * SS))
+    img = over(img, _shrink(st, W))
+    save("cell_wool", img, ppu=128)
+
+
+def make_glow():
+    """Quầng sáng vàng bo vuông phủ lên ô thuộc hàng/cột sắp đầy khi đang đưa khối vào."""
+    W = 128
+    big = Image.new("L", (W * SS, W * SS), 0)
+    ImageDraw.Draw(big).rounded_rectangle([12 * SS, 12 * SS, (W - 12) * SS, (W - 12) * SS], radius=14 * SS, fill=255)
+    core = big.resize((W, W), Image.LANCZOS)
+    halo = np.asarray(core.filter(ImageFilter.GaussianBlur(9)), float) / 255
+    inner = np.asarray(core, float) / 255
+    a = np.clip(halo * 0.9 + inner * 0.25, 0, 1)
+    arr = np.zeros((W, W, 4), np.uint8)
+    arr[..., 0], arr[..., 1], arr[..., 2] = 255, 226, 120
+    arr[..., 3] = (a * 255).astype(np.uint8)
+    save("fx_cell_glow", Image.fromarray(arr, "RGBA"), ppu=128)
+
+
+# ----------------------------------------------------------------------------- menu rừng nhỏ
+def _leaf_poly(cx, cy, length, width, ang):
+    """Đa giác chiếc lá (nhọn hai đầu), ang tính bằng độ, trả về danh sách điểm."""
+    pts = []
+    ca, sa = math.cos(math.radians(ang)), math.sin(math.radians(ang))
+    for t in np.linspace(0, 1, 14):
+        x = t * length
+        y = math.sin(t * math.pi) * width * (1 - 0.25 * t)
+        pts.append((x, y))
+    for t in np.linspace(1, 0, 14):
+        x = t * length
+        y = -math.sin(t * math.pi) * width * (1 - 0.25 * t)
+        pts.append((x, y))
+    return [(cx + x * ca - y * sa, cy + x * sa + y * ca) for x, y in pts]
+
+
+def _draw_leaf(d, cx, cy, length, width, ang, col, vein=True, S=1):
+    col = tuple(int(c) for c in col)
+    pts = _leaf_poly(cx, cy, length, width, ang)
+    d.polygon([(x * S, y * S) for x, y in pts], fill=col)
+    if vein:
+        ex, ey = cx + math.cos(math.radians(ang)) * length * 0.92, cy + math.sin(math.radians(ang)) * length * 0.92
+        d.line([(cx * S, cy * S), (ex * S, ey * S)], fill=tuple(min(255, c + 40) for c in col[:3]) + (255,), width=max(1, int(S * 1.2)))
+
+
+def _draw_flower(d, x, y, r, petal, center, S=1):
+    petal = tuple(int(c) for c in petal)
+    center = tuple(int(c) for c in center)
+    for k in range(5):
+        ang = k * 1.2566 - 1.57
+        px, py = x + math.cos(ang) * r * 0.9, y + math.sin(ang) * r * 0.9
+        d.ellipse([(px - r * 0.75) * S, (py - r * 0.75) * S, (px + r * 0.75) * S, (py + r * 0.75) * S], fill=petal)
+    d.ellipse([(x - r * 0.55) * S, (y - r * 0.55) * S, (x + r * 0.55) * S, (y + r * 0.55) * S], fill=center)
+
+
+def make_menu_bg():
+    """Nền rừng hoàng hôn: trời tím-hồng, trăng mờ, các lớp đồi cây xa dần, sương cuối cùng ở dưới."""
+    W, H = 720, 1280
+    sky = np.zeros((H, W, 3), float)
+    stops = [(0.0, (30, 28, 70)), (0.35, (84, 56, 110)), (0.58, (190, 100, 110)), (0.72, (244, 170, 110)), (1.0, (60, 70, 60))]
+    ys = np.linspace(0, 1, H)
+    for c in range(3):
+        sky[..., c] = np.interp(ys, [s[0] for s in stops], [s[1][c] for s in stops])[:, None]
+    img = Image.fromarray(sky.astype(np.uint8), "RGB").convert("RGBA")
+    r = np.random.default_rng(77)
+    # sao
+    d = ImageDraw.Draw(img, "RGBA")
+    for _ in range(90):
+        x, y = r.uniform(0, W), r.uniform(0, H * 0.42)
+        a = int(r.uniform(90, 230) * (1 - y / (H * 0.45)))
+        s = r.uniform(0.8, 2.0)
+        d.ellipse([x - s, y - s, x + s, y + s], fill=(255, 245, 220, max(40, a)))
+    # trăng + quầng
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).ellipse([430, 170, 640, 380], fill=(255, 224, 170, 90))
+    img = over(img, glow.filter(ImageFilter.GaussianBlur(46)))
+    d = ImageDraw.Draw(img, "RGBA")
+    d.ellipse([480, 220, 590, 330], fill=(255, 242, 214, 255))
+    d.ellipse([505, 238, 540, 272], fill=(240, 222, 190, 120))
+    d.ellipse([538, 280, 562, 304], fill=(240, 222, 190, 100))
+
+    def hills(base, amp, col, seed, trees, tcol, tscale):
+        rr = np.random.default_rng(seed)
+        layer = Image.new("RGBA", (W * 2, H * 2), (0, 0, 0, 0))
+        dl = ImageDraw.Draw(layer, "RGBA")
+        pts = [(0, H * 2)]
+        ph = rr.uniform(0, 6)
+        for x in range(0, W * 2 + 8, 8):
+            y = H * 2 * base - (math.sin(x / 2 / 140 + ph) * 0.6 + math.sin(x / 2 / 61 + ph * 2) * 0.4) * amp * 2
+            pts.append((x, y))
+        pts.append((W * 2, H * 2))
+        dl.polygon(pts, fill=col)
+        for _ in range(trees):   # cây thông
+            tx = rr.uniform(0, W)
+            idx = int(tx * 2 / 8) + 1
+            ty = pts[min(idx, len(pts) - 2)][1] / 2 + 6
+            hgt = rr.uniform(70, 130) * tscale
+            wid = hgt * 0.38
+            for k in range(4):
+                top = ty - hgt + k * hgt * 0.22
+                bot = ty - hgt * 0.2 + k * hgt * 0.1
+                bw = wid * (0.45 + k * 0.22)
+                dl.polygon([(tx * 2, top * 2), ((tx - bw) * 2, bot * 2), ((tx + bw) * 2, bot * 2)], fill=tcol)
+            dl.rectangle([(tx - 2) * 2, (ty - hgt * 0.2) * 2, (tx + 2) * 2, (ty + 4) * 2], fill=tcol)
+        return layer.resize((W, H), Image.LANCZOS)
+
+    img = over(img, hills(0.66, 40, (96, 70, 110, 255), 1, 26, (88, 64, 104, 255), 0.7))
+    mist = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    ImageDraw.Draw(mist).rectangle([0, int(H * 0.60), W, int(H * 0.74)], fill=(255, 190, 150, 70))
+    img = over(img, mist.filter(ImageFilter.GaussianBlur(40)))
+    img = over(img, hills(0.74, 44, (52, 62, 84, 255), 2, 30, (44, 56, 80, 255), 0.95))
+    img = over(img, hills(0.83, 36, (28, 52, 56, 255), 3, 22, (22, 44, 50, 255), 1.3))
+    img = over(img, hills(0.93, 24, (18, 38, 38, 255), 4, 8, (14, 32, 34, 255), 1.7))
+    # tối dần ở rìa trên cho nổi bật chữ
+    vig = np.zeros((H, W, 4), np.uint8)
+    yy, xx = np.mgrid[0:H, 0:W]
+    dist = np.sqrt(((xx - W / 2) / (W * 0.75)) ** 2 + ((yy - H * 0.45) / (H * 0.75)) ** 2)
+    vig[..., 3] = (np.clip(dist - 0.45, 0, 1) ** 1.5 * 150).astype(np.uint8)
+    img = over(img, Image.fromarray(vig, "RGBA"))
+    save("menu_bg", img, ppu=100)
+
+
+def make_menu_vine(name, seed, flip):
+    """Dây leo rũ từ góc trên xuống, có lá và vài bông hoa. Sprite 300x760."""
+    W, H = 300, 760
+    S = 3
+    r = np.random.default_rng(seed)
+    big = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(big, "RGBA")
+    # đường dây chính: đi xuống uốn lượn
+    pts = []
+    for t in np.linspace(0, 1, 120):
+        x = 40 + math.sin(t * 6.2 + seed) * 28 + t * 70 + math.sin(t * 15) * 4
+        y = -10 + t * (H - 80)
+        pts.append((x, y))
+    d.line([(x * S, y * S) for x, y in pts], fill=(58, 100, 44, 255), width=int(7 * S), joint="curve")
+    d.line([(x * S, y * S) for x, y in pts], fill=(96, 150, 62, 255), width=int(3.4 * S), joint="curve")
+    # dây phụ
+    for st in (0.22, 0.45, 0.66):
+        i = int(st * len(pts))
+        px, py = pts[i]
+        side = 1 if r.random() > 0.5 else -1
+        sub = []
+        for t in np.linspace(0, 1, 40):
+            sub.append((px + side * t * 70 + math.sin(t * 5) * 8, py + t * 120 + math.sin(t * 3 + st) * 6))
+        d.line([(x * S, y * S) for x, y in sub], fill=(70, 118, 50, 255), width=int(4 * S), joint="curve")
+        for k in range(3, 40, 6):
+            lx, ly = sub[k]
+            _draw_leaf(d, lx, ly, 26, 9, r.uniform(-30, 30) + (0 if side > 0 else 180) + 40, (112, 176, 70, 255), S=S)
+    for i in range(4, len(pts) - 2, 5):
+        lx, ly = pts[i]
+        base = r.choice([-1, 1])
+        ang = (35 if base > 0 else 145) + r.uniform(-25, 25)
+        tone = r.choice([(104, 170, 66, 255), (136, 196, 82, 255), (78, 138, 56, 255)])
+        _draw_leaf(d, lx, ly, r.uniform(30, 48), r.uniform(10, 16), ang, tone, S=S)
+    for st, col in [(0.18, (255, 214, 120)), (0.38, (255, 170, 190)), (0.58, (255, 250, 235)), (0.80, (255, 190, 120))]:
+        fx, fy = pts[int(st * len(pts))]
+        _draw_flower(d, fx + r.uniform(-8, 8), fy, 10 + r.uniform(0, 3), col + (255,), (240, 150, 50, 255), S=S)
+    img = big.resize((W, H), Image.LANCZOS)
+    if flip:
+        img = img.transpose(Image.FLIP_LEFT_RIGHT)
+    # bóng nhẹ phía sau để lá nổi trên nền
+    sh = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    a = np.asarray(img.split()[3], float) * 0.35
+    sh.putalpha(Image.fromarray(a.astype(np.uint8)))
+    sh = sh.filter(ImageFilter.GaussianBlur(3))
+    save(name, over(sh, img), ppu=100)
+
+
+def make_menu_bush():
+    """Bụi cây + hoa dọc mép dưới màn hình, 720x300 (gấu thò đầu ra từ sau bụi)."""
+    W, H = 720, 300
+    S = 2
+    r = np.random.default_rng(88)
+    big = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(big, "RGBA")
+    for layer, (col, ytop) in enumerate([((34, 74, 44, 255), 110), ((52, 104, 52, 255), 150), ((78, 140, 64, 255), 190)]):
+        for _ in range(70):
+            x = r.uniform(-20, W + 20)
+            y = ytop + r.uniform(-20, 40)
+            rad = r.uniform(26, 48)
+            d.ellipse([(x - rad) * S, (y - rad * 0.8) * S, (x + rad) * S, (y + rad * 0.8) * S], fill=col)
+        d.rectangle([0, (ytop + 30) * S, W * S, H * S], fill=col)
+    for _ in range(46):
+        x = r.uniform(0, W); y = r.uniform(100, 250)
+        _draw_leaf(d, x, y, r.uniform(26, 44), r.uniform(8, 12), r.uniform(200, 340),
+                   r.choice([(120, 190, 78, 255), (98, 164, 66, 255), (150, 208, 96, 255)]), S=S)
+    for _ in range(16):
+        x = r.uniform(10, W - 10); y = r.uniform(110, 230)
+        _draw_flower(d, x, y, r.uniform(7, 11),
+                     r.choice([(255, 244, 230, 255), (255, 200, 120, 255), (255, 160, 184, 255), (255, 226, 110, 255)]),
+                     (240, 150, 50, 255), S=S)
+    save("menu_bush", big.resize((W, H), Image.LANCZOS), ppu=100)
+
+
+def _sign(name, w, h, ropes, nails=True):
+    """Bảng gỗ treo bằng hai sợi dây (ropes = chiều cao dây phía trên bảng)."""
+    pad = 6
+    total_h = h + ropes
+    img = Image.new("RGBA", (w, total_h), (0, 0, 0, 0))
+    plank = plate(w, h, 26, ((150, 98, 56), (104, 64, 36)), ((214, 160, 98), (178, 124, 70)), 8, (60, 34, 20),
+                  face_arr=wood_arr(w, h, (216, 164, 102), (176, 122, 68), 0.1))
+    # vài đường ghép ván
+    seam = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    ds = ImageDraw.Draw(seam)
+    for yy in (h // 3, 2 * h // 3):
+        ds.line([(30, yy), (w - 30, yy)], fill=(80, 46, 26, 70), width=3)
+    seam.putalpha(Image.eval(seam.split()[3], lambda v: v))
+    plank = over(plank, seam)
+    img.alpha_composite(plank, (0, ropes))
+    d = ImageDraw.Draw(img, "RGBA")
+    for rx in (int(w * 0.2), int(w * 0.8)):
+        d.line([(rx, 0), (rx, ropes + 20)], fill=(120, 84, 48, 255), width=9)
+        d.line([(rx - 2, 0), (rx - 2, ropes + 20)], fill=(176, 130, 80, 255), width=3)
+        for k in range(0, ropes, 14):
+            d.line([(rx - 5, k), (rx + 5, k + 7)], fill=(86, 56, 30, 200), width=2)
+        if nails:
+            d.ellipse([rx - 11, ropes + 12, rx + 11, ropes + 34], fill=(70, 70, 76, 255))
+            d.ellipse([rx - 6, ropes + 16, rx + 2, ropes + 24], fill=(180, 180, 190, 255))
+    save(name, img, ppu=100)
+    return img
+
+
+def make_menu_signs():
+    _sign("menu_sign", 760, 280, 70)
+    _sign("menu_plank", 480, 170, 90)
+    # lá lẻ để làm lá rơi
+    W = 64
+    S = 4
+    big = Image.new("RGBA", (W * S, W * S), (0, 0, 0, 0))
+    d = ImageDraw.Draw(big, "RGBA")
+    _draw_leaf(d, 8, 32, 48, 17, 0, (150, 206, 96, 255), S=S)
+    _draw_leaf(d, 8, 32, 48, 8, 0, (110, 168, 68, 255), vein=False, S=S)
+    d.line([(8 * S, 32 * S), (54 * S, 32 * S)], fill=(196, 236, 150, 255), width=2 * S)
+    save("menu_leaf", big.resize((W, W), Image.LANCZOS), ppu=100)
+
+
+def make_forest_menu():
+    make_menu_bg()
+    make_menu_vine("menu_vine_left", 3, False)
+    make_menu_vine("menu_vine_right", 9, True)
+    make_menu_bush()
+    make_menu_signs()
+
+
 # ----------------------------------------------------------------------------- preview
 def make_preview():
     def load(n):
@@ -482,6 +886,12 @@ if __name__ == "__main__":
     make_mascot()
     make_background()
     make_fx()
+    make_cell_grass()
+    make_cell_gem()
+    make_cell_melon()
+    make_cell_wool()
+    make_glow()
+    make_forest_menu()
     with open(os.path.join(OUT, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump({"items": manifest}, f, indent=2)
     make_preview()

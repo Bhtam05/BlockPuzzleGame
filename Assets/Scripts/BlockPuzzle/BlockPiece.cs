@@ -82,7 +82,8 @@ namespace BlockPuzzle
                 SpriteRenderer sr = Instantiate(cellPrefab, transform);
                 sr.transform.localPosition = ((Vector2)c - _pivot) * grid.CellSize;
                 sr.transform.localScale = Vector3.one * grid.CellSize;
-                sr.color = shape.color;
+                if (grid.SkinSprite != null) sr.sprite = grid.SkinSprite;
+                sr.color = grid.SkinColor(shape.color);
                 sr.sortingOrder = traySortingOrder;
                 _renderers.Add(sr);
             }
@@ -126,7 +127,7 @@ namespace BlockPuzzle
             _dragging = true;
             AudioManager.Play(Sfx.Pick);
 
-            transform.DOKill();
+            transform.DOKill(); // cũng dừng animation đổi chất liệu đang chờ (OnKill sẽ áp chất liệu mới ngay)
             SetSorting(dragSortingOrder);
             transform.DOScale(1f, 0.1f).SetEase(Ease.OutQuad);
             Vector3 start = PointerToWorld(e);
@@ -204,6 +205,51 @@ namespace BlockPuzzle
                     _collider.enabled = true;
                     SetSorting(traySortingOrder);
                 });
+        }
+
+        // ----------------------------------------------------------------- Đổi chất liệu
+
+        /// <summary>
+        /// Đổi chất liệu theo bảng. Mỗi ô con đổi lần lượt sau baseDelay (cùng nhịp với gợn sóng trên bảng) và nảy lên.
+        /// Nếu bị ngắt giữa chừng (người chơi nhấc khối lên) thì áp chất liệu mới ngay.
+        /// </summary>
+        public void RefreshSkin(float baseDelay)
+        {
+            Sequence seq = DOTween.Sequence().SetTarget(transform);
+            for (int i = 0; i < _renderers.Count; i++)
+            {
+                SpriteRenderer sr = _renderers[i];
+                seq.InsertCallback(baseDelay + i * 0.05f, () =>
+                {
+                    if (sr == null) return;
+                    ApplySkinTo(sr);
+                    Transform tr = sr.transform;
+                    tr.localScale = Vector3.one * (_grid.CellSize * 0.55f);
+                    tr.DOScale(_grid.CellSize, 0.3f).SetEase(Ease.OutBack).SetTarget(transform);
+                });
+            }
+            bool finished = false;
+            seq.OnComplete(() => finished = true);
+            seq.OnKill(() => { if (!finished) ApplySkinNow(); });
+        }
+
+        private void ApplySkinTo(SpriteRenderer sr)
+        {
+            if (_grid.SkinSprite != null) sr.sprite = _grid.SkinSprite;
+            sr.color = _grid.SkinColor(Shape.color);
+        }
+
+        /// <summary>Áp chất liệu hiện tại cho mọi ô con và trả scale về chuẩn (dùng khi animation đổi bị ngắt).</summary>
+        private void ApplySkinNow()
+        {
+            if (_grid == null || Shape == null) return;
+            for (int i = 0; i < _renderers.Count; i++)
+            {
+                SpriteRenderer sr = _renderers[i];
+                if (sr == null) continue;
+                ApplySkinTo(sr);
+                sr.transform.localScale = Vector3.one * _grid.CellSize;
+            }
         }
 
         private void SetSorting(int order)

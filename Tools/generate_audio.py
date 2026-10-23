@@ -132,6 +132,16 @@ def sfx_gameover():
     return fade_edges(normalize(buf, 0.85), 12)
 
 
+def sfx_levelup():
+    """Đổi chất liệu khối: arpeggio đi lên sáng và lấp lánh (C5 G5 C6 E6)."""
+    buf = np.zeros(int(SR * 1.1))
+    for i, f in enumerate([523.25, 783.99, 1046.5, 1318.5]):
+        mix_at(buf, tone(f, 0.55, decay=6, harm=(1.0, 0.4, 0.15)) * (0.75 + 0.06 * i), i * 0.09)
+    mix_at(buf, tone(2093, 0.5, decay=7, harm=(1.0,)) * 0.2, 0.3)
+    mix_at(buf, tone(2637, 0.4, decay=9, harm=(1.0,)) * 0.15, 0.4)
+    return fade_edges(normalize(buf, 0.8), 10)
+
+
 # ---------------------------------------------------------------- Nhạc nền
 
 def bgm_main():
@@ -183,4 +193,5 @@ if __name__ == "__main__":
     write("sfx_clear", sfx_clear())
     write("sfx_combo", sfx_combo())
     write("sfx_gameover", sfx_gameover())
+    write("sfx_levelup", sfx_levelup())
     write("bgm_main", bgm_main())

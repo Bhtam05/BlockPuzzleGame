@@ -56,6 +56,7 @@ namespace BlockPuzzle.EditorTools
         // Tên game hiển thị ở menu chính: đổi chữ này rồi chạy lại Build UI
         private const string TxtGameName = "BLOCK PUZZLE";
         private static string TxtStart => Tx("BẮT ĐẦU", "START");
+        private static string TxtContinue => Tx("TIẾP TỤC", "CONTINUE");
         private static string TxtSettings => Tx("CÀI ĐẶT", "SETTINGS");
         private static string TxtHome => Tx("TRANG CHỦ", "HOME");
         private static string TxtBack => Tx("QUAY LẠI", "BACK");
@@ -212,6 +213,7 @@ namespace BlockPuzzle.EditorTools
             SetupBoardFrame(grid);
             Canvas hud = BuildHud(score, gm);
             SetupEffects(grid, gm);
+            SetupThemes(grid, spawner, gm);
 
             Undo.CollapseUndoOperations(undoGroup);
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
@@ -472,6 +474,51 @@ namespace BlockPuzzle.EditorTools
             SetRef(gm, "effects", fx);
         }
 
+        /// <summary>
+        /// Hệ thống chất liệu khối (gỗ -> cỏ, đá quý, dưa hấu, vải len theo mốc điểm) và sprite sáng "gần xong".
+        /// Tạo object Themes nếu chưa có, gán lại danh sách chất liệu mỗi lần chạy.
+        /// </summary>
+        private static void SetupThemes(GridManager grid, BlockSpawner spawner, GameManager gm)
+        {
+            var themes = Find<BlockThemeManager>();
+            if (themes == null)
+            {
+                var go = new GameObject("Themes");
+                Undo.RegisterCreatedObjectUndo(go, "Create Themes");
+                themes = go.AddComponent<BlockThemeManager>();
+            }
+
+            SetRef(themes, "grid", grid);
+            SetRef(themes, "spawner", spawner);
+            SetRef(themes, "effects", Find<ClearEffects>());
+
+            // Gỗ luôn đứng đầu; các chất liệu sau ra theo thứ tự ngẫu nhiên
+            (string name, string sprite, bool tint, Color fx)[] defs =
+            {
+                (Tx("Gỗ", "Wood"), "cell_block", true, new Color32(246, 200, 140, 255)),
+                (Tx("Cỏ xanh", "Grass"), "cell_grass", false, new Color32(120, 196, 72, 255)),
+                (Tx("Đá quý", "Gems"), "cell_gem", false, new Color32(96, 170, 255, 255)),
+                (Tx("Dưa hấu", "Melon"), "cell_melon", false, new Color32(255, 96, 96, 255)),
+                (Tx("Vải len", "Wool"), "cell_wool", false, new Color32(255, 150, 200, 255)),
+            };
+
+            var so = new SerializedObject(themes);
+            SerializedProperty arr = so.FindProperty("skins");
+            arr.arraySize = defs.Length;
+            for (int i = 0; i < defs.Length; i++)
+            {
+                SerializedProperty e = arr.GetArrayElementAtIndex(i);
+                e.FindPropertyRelative("displayName").stringValue = defs[i].name;
+                e.FindPropertyRelative("sprite").objectReferenceValue = LoadSprite(defs[i].sprite);
+                e.FindPropertyRelative("tintByShape").boolValue = defs[i].tint;
+                e.FindPropertyRelative("fxColor").colorValue = defs[i].fx;
+            }
+            so.ApplyModifiedProperties();
+
+            SetRef(grid, "hintSprite", LoadSprite("fx_cell_glow"));
+            SetRef(gm, "themes", themes);
+        }
+
         /// <summary>Prefab chữ điểm bay lên: TextMeshPro 3D (nằm trong thế giới game) có viền nâu.</summary>
         private static TextMeshPro CreatePopupPrefab(Material outline)
         {
@@ -657,39 +704,100 @@ namespace BlockPuzzle.EditorTools
             SetRef(gm, "pausePanel", root.gameObject);
         }
 
-        /// <summary>Menu chính: nền gỗ phủ kín màn hình, khung tên game, nút Bắt đầu và Cài đặt.</summary>
+        /// <summary>
+        /// Menu chính "rừng nhỏ hoàng hôn": nền rừng + trăng, bảng tên gỗ treo (gấu thò đầu), bảng kỷ lục treo dưới,
+        /// dây leo hai bên, đom đóm và lá rơi (MenuScreen lo chuyển động), bụi cây hoa phía trước, nút Bắt đầu / Cài đặt.
+        /// </summary>
         private static void BuildMenuScreen(Transform parent, GameManager gm, Material outGreen, Material outBrown)
         {
             RectTransform root = NewRect("MenuPanel", parent);
             Stretch(root);
 
-            // Nền gỗ phủ kín, chặn chạm xuống ván chơi phía dưới
-            Image bg = NewImage("Background", root, LoadSprite("bg_wood"), null, true);
+            // Nền: phủ kín mọi tỉ lệ màn hình (cắt bớt phần thừa), chặn chạm xuống ván chơi phía dưới
+            Image bg = NewImage("Background", root, LoadSprite("menu_bg"), null, true);
             bg.preserveAspect = false;
             Stretch(bg.rectTransform);
+            var fit = bg.gameObject.AddComponent<AspectRatioFitter>();
+            fit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+            fit.aspectRatio = 720f / 1280f;
 
-            // Khung tên game
-            RectTransform title = NewImage("TitleWindow", root, LoadSprite("popup_panel")).rectTransform;
-            Place(title, TC, TC, new Vector2(0f, -470f), new Vector2(840f, 380f));
+            // Lớp đom đóm + lá rơi (sau bảng và dây leo)
+            RectTransform particles = NewRect("Particles", root);
+            Stretch(particles);
 
-            Image mascot = NewImage("Mascot", title, LoadSprite("mascot"));
-            Place(mascot.rectTransform, TC, BC, new Vector2(0f, -40f), new Vector2(300f, 235f));
+            // Bụi cây hoa dưới đáy, phủ ngang màn hình
+            Image bush = NewImage("Bush", root, LoadSprite("menu_bush"));
+            Place(bush.rectTransform, BC, BC, Vector2.zero, new Vector2(1080f, 450f));
+            bush.preserveAspect = false;
+            SetAnchors(bush.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0f));
+            bush.rectTransform.pivot = BC;
+            bush.rectTransform.offsetMin = Vector2.zero;
+            bush.rectTransform.offsetMax = new Vector2(0f, 450f);
 
-            TextMeshProUGUI name = NewText("GameName", title, TxtGameName, 120f, Brown,
+            // Bảng kỷ lục (vẽ trước bảng tên để dây treo nằm khuất sau bảng tên)
+            Image plank = NewImage("BestPlank", root, LoadSprite("menu_plank"));
+            Place(plank.rectTransform, TC, TC, new Vector2(0f, -530f), new Vector2(560f, 303f));
+            plank.rectTransform.pivot = TC;
+            TextMeshProUGUI bestCaption = NewText("Caption", plank.transform, TxtBest, 36f, CreamDim,
                 TextAlignmentOptions.Center, null);
-            name.enableAutoSizing = true;
-            name.fontSizeMin = 60f;
-            name.fontSizeMax = 120f;
-            Place(name.rectTransform, MC, MC, new Vector2(0f, -30f), new Vector2(720f, 170f));
+            SetAnchors(bestCaption.rectTransform, new Vector2(0.28f, 0.40f), new Vector2(0.96f, 0.60f));
+            TextMeshProUGUI bestValue = NewText("Value", plank.transform, "0", 88f, Cream,
+                TextAlignmentOptions.Center, outBrown);
+            bestValue.enableAutoSizing = true;
+            bestValue.fontSizeMin = 40f;
+            bestValue.fontSizeMax = 88f;
+            SetAnchors(bestValue.rectTransform, new Vector2(0.28f, 0.04f), new Vector2(0.96f, 0.42f));
+            Image crown = NewImage("Crown", plank.transform, LoadSprite("icon_crown"));
+            Place(crown.rectTransform, new Vector2(0.17f, 0.30f), MC, Vector2.zero, new Vector2(84f, 56f));
+
+            // Bảng tên game treo trên cùng + gấu thò đầu
+            Image sign = NewImage("TitleSign", root, LoadSprite("menu_sign"));
+            Place(sign.rectTransform, TC, TC, new Vector2(0f, -230f), new Vector2(880f, 405f));
+            sign.rectTransform.pivot = TC;
+
+            // Thân bảng bắt đầu cách đỉnh 70/350 chiều cao ảnh (phần trên là hai sợi dây)
+            float bodyTop = -(70f / 350f) * 405f;
+            Image mascot = NewImage("Mascot", sign.transform, LoadSprite("mascot"));
+            Place(mascot.rectTransform, TC, BC, new Vector2(0f, bodyTop - 14f), new Vector2(288f, 225f));
+
+            TextMeshProUGUI gameName = NewText("GameName", sign.transform, TxtGameName, 110f, Cream,
+                TextAlignmentOptions.Center, outBrown);
+            gameName.enableAutoSizing = true;
+            gameName.fontSizeMin = 50f;
+            gameName.fontSizeMax = 110f;
+            SetAnchors(gameName.rectTransform, new Vector2(0.06f, 0.06f), new Vector2(0.94f, 0.58f));
+
+            // Dây leo hai bên (đè lên mép bảng cho có chiều sâu)
+            Image vineL = NewImage("VineLeft", root, LoadSprite("menu_vine_left"));
+            Place(vineL.rectTransform, TL, new Vector2(0.28f, 1f), new Vector2(103f, 0f), new Vector2(420f, 1064f));
+            Image vineR = NewImage("VineRight", root, LoadSprite("menu_vine_right"));
+            Place(vineR.rectTransform, TR, new Vector2(0.72f, 1f), new Vector2(-103f, 0f), new Vector2(420f, 1064f));
 
             // Nút
             Button start = NewButton("StartButton", root, LoadSprite("btn_green"), TxtStart, 64f, outGreen);
-            Place(start.image.rectTransform, MC, MC, new Vector2(0f, -140f), new Vector2(620f, 170f));
+            Place(start.image.rectTransform, MC, MC, new Vector2(0f, -150f), new Vector2(620f, 170f));
             UnityEventTools.AddVoidPersistentListener(start.onClick, gm.PlayGame);
 
             Button settings = NewButton("SettingsButton", root, LoadSprite("btn_gold"), TxtSettings, 64f, outBrown);
-            Place(settings.image.rectTransform, MC, MC, new Vector2(0f, -360f), new Vector2(620f, 170f));
+            Place(settings.image.rectTransform, MC, MC, new Vector2(0f, -370f), new Vector2(620f, 170f));
             UnityEventTools.AddVoidPersistentListener(settings.onClick, gm.OpenSettings);
+
+            // Chuyển động + dữ liệu động (kỷ lục, nhãn Tiếp tục)
+            var menu = root.gameObject.AddComponent<MenuScreen>();
+            SetRef(menu, "titleSign", sign.rectTransform);
+            SetRef(menu, "bestPlank", plank.rectTransform);
+            SetRef(menu, "mascot", mascot.rectTransform);
+            SetRef(menu, "bestValue", bestValue);
+            SetRef(menu, "startButton", start.image.rectTransform);
+            SetRef(menu, "settingsButton", settings.image.rectTransform);
+            SetRef(menu, "startLabel", start.transform.Find("Label").GetComponent<TextMeshProUGUI>());
+            SetRef(menu, "vineLeft", vineL.rectTransform);
+            SetRef(menu, "vineRight", vineR.rectTransform);
+            SetRef(menu, "particleLayer", particles);
+            SetRef(menu, "fireflySprite", LoadSprite("fx_mote"));
+            SetRef(menu, "leafSprite", LoadSprite("menu_leaf"));
+            SetString(menu, "startText", TxtStart);
+            SetString(menu, "continueText", TxtContinue);
 
             root.gameObject.SetActive(false); // GameManager bật khi vào game
             SetRef(gm, "menuPanel", root.gameObject);
@@ -932,6 +1040,15 @@ namespace BlockPuzzle.EditorTools
                 return;
             }
             p.objectReferenceValue = value;
+            so.ApplyModifiedProperties();
+        }
+
+        private static void SetString(Object target, string field, string value)
+        {
+            var so = new SerializedObject(target);
+            SerializedProperty p = so.FindProperty(field);
+            if (p == null) return;
+            p.stringValue = value;
             so.ApplyModifiedProperties();
         }
 

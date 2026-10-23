@@ -10,7 +10,8 @@ namespace BlockPuzzle
         Click,
         Clear,
         Combo,
-        GameOver
+        GameOver,
+        LevelUp
     }
 
     /// <summary>
@@ -28,7 +29,7 @@ namespace BlockPuzzle
 
         private static AudioManager s_instance;
 
-        private readonly AudioClip[] _clips = new AudioClip[6];
+        private readonly AudioClip[] _clips = new AudioClip[7];
         private AudioSource[] _pool;
         private AudioSource _music;
         private int _next;
@@ -58,6 +59,7 @@ namespace BlockPuzzle
             _clips[(int)Sfx.Clear] = Resources.Load<AudioClip>("Audio/sfx_clear");
             _clips[(int)Sfx.Combo] = Resources.Load<AudioClip>("Audio/sfx_combo");
             _clips[(int)Sfx.GameOver] = Resources.Load<AudioClip>("Audio/sfx_gameover");
+            _clips[(int)Sfx.LevelUp] = Resources.Load<AudioClip>("Audio/sfx_levelup");
 
             _pool = new AudioSource[PoolSize];
             for (int i = 0; i < PoolSize; i++)
